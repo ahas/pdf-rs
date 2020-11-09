@@ -4,6 +4,7 @@
 /// Index of the page (0-based)
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct PdfPageIndex(pub(crate) usize);
+
 /// Index of the layer on the nth page
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct PdfLayerIndex(pub(crate) usize);
@@ -17,8 +18,7 @@ pub struct PdfContentIndex(pub(crate) usize);
 pub struct FontIndex(pub(crate) PdfContentIndex);
 
 impl Into<PdfContentIndex> for FontIndex {
-    fn into(self) -> PdfContentIndex
-    {
+    fn into(self) -> PdfContentIndex {
         self.0
     }
 }
@@ -28,8 +28,7 @@ impl Into<PdfContentIndex> for FontIndex {
 pub struct SvgIndex(pub(crate) PdfContentIndex);
 
 impl Into<PdfContentIndex> for SvgIndex {
-    fn into(self) -> PdfContentIndex
-    {
+    fn into(self) -> PdfContentIndex {
         self.0
     }
 }

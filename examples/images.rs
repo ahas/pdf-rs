@@ -1,14 +1,15 @@
 extern crate printpdf;
 
-use printpdf::*;
-use std::io::Cursor;
 use image::bmp::BmpDecoder;
+use printpdf::*;
 use std::fs::File;
 use std::io::BufWriter;
+use std::io::Cursor;
 
 fn main() {
-    let (doc, page1, layer1) = PdfDocument::new("printpdf graphics test", Mm(210.0), Mm(297.0), "Layer 1");
-    let current_layer = doc.get_page(page1).get_layer(layer1);
+    let mut doc = PdfDocument::new("printpdf graphics test");
+    let mut page = PdfPage::new(Mm(210.0), Mm(297.0));
+    let mut layer = PdfLayer::new("Layer 1");
 
     // currently, the only reliable file formats are bmp/jpeg/png
     // this is an issue of the image library, not a fault of printpdf
@@ -19,8 +20,12 @@ fn main() {
     let decoder = BmpDecoder::new(&mut reader).unwrap();
     let image2 = Image::try_from(decoder).unwrap();
 
-    // layer,     
-    image2.add_to_layer(current_layer.clone(), None, None, None, None, None, None);
+    // layer,
+    image2.add_to_layer(&mut page, &mut layer, None, None, None, None, None, None);
 
-    doc.save(&mut BufWriter::new(File::create("test_image.pdf").unwrap())).unwrap();
+    page.add_layer(layer);
+    doc.add_page(page);
+
+    doc.save(&mut BufWriter::new(File::create("test_image.pdf").unwrap()))
+        .unwrap();
 }

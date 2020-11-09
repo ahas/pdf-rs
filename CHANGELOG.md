@@ -1,5 +1,11 @@
 # Changelog
 
+## `0.4.0` (unreleased)
+
+- Remove `PdfDocumentReference`, `PdfPageReference` and `PdfLayerReference`. All functionality is moved to
+  `PdfDocument`, `PdfPage` and `PdfLayer` respectively.
+- Remove `set_overprint_fill`, `set_overprint_stroke` and `set_blend_mode`. Use `set_graphics_state` instead.
+
 ## `0.3.1`
 
 - Fix issue with Fonts on iOS and macOS
@@ -37,9 +43,9 @@
   - .hdr (High Dynamic Range Image)
   - .dxt (S3 Texture Compression)
   - .webp (WEBP format)
-  **If you don't re-enable these features, image decoding might fail at runtime!**
-  The reason they were removed was because of compile-time performance. For extra speed
-  when JPEG decoding, please also turn on `jpeg_rayon`
+    **If you don't re-enable these features, image decoding might fail at runtime!**
+    The reason they were removed was because of compile-time performance. For extra speed
+    when JPEG decoding, please also turn on `jpeg_rayon`
 - No other API removals or large API changes
 - Notable: `cargo build --no-default-features` has now "only" 33 dependencies and
   `printpdf` has a debug build time of roughly 20 seconds

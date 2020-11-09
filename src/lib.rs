@@ -31,9 +31,17 @@
 //! use std::fs::File;
 //! use std::io::BufWriter;
 //!
-//! let (doc, page1, layer1) = PdfDocument::new("PDF_Document_title", Mm(247.0), Mm(210.0), "Layer 1");
-//! let (page2, layer1) = doc.add_page(Mm(10.0), Mm(250.0),"Page 2, Layer 1");
+//! let mut doc = PdfDocument::new("PDF_Document_title");
+//! let mut page1 = PdfPage::new(Mm(297.0), Mm(210.0));
+//! let layer1 = PdfLayer::new("Layer 1");
+//! page1.add_layer(layer1);
 //!
+//! let mut page2 = PdfPage::new(Mm(10.0), Mm(250.0));
+//! let layer1 = PdfLayer::new("Page 2, Layer 1");
+//! page2.add_layer(layer1);
+//!
+//! doc.add_page(page1);
+//! doc.add_page(page2);
 //! doc.save(&mut BufWriter::new(File::create("test_working.pdf").unwrap())).unwrap();
 //! ```
 //!
@@ -45,8 +53,9 @@
 //! use std::io::BufWriter;
 //! use std::iter::FromIterator;
 //!
-//! let (doc, page1, layer1) = PdfDocument::new("printpdf graphics test", Mm(297.0), Mm(210.0), "Layer 1");
-//! let current_layer = doc.get_page(page1).get_layer(layer1);
+//! let mut doc = PdfDocument::new("printpdf graphics test");
+//! let mut page1 = PdfPage::new(Mm(297.0), Mm(210.0));
+//! let mut layer1 = PdfLayer::new("Layer 1");
 //!
 //! // Quadratic shape. The "false" determines if the next (following)
 //! // point is a bezier handle (for curves)
@@ -84,28 +93,37 @@
 //! let mut dash_pattern = LineDashPattern::default();
 //! dash_pattern.dash_1 = Some(20);
 //!
-//! current_layer.set_fill_color(fill_color);
-//! current_layer.set_outline_color(outline_color);
-//! current_layer.set_outline_thickness(10.0);
+//! layer1.set_fill_color(fill_color);
+//! layer1.set_outline_color(outline_color);
+//! layer1.set_outline_thickness(10.0);
 //!
 //! // Draw first line
-//! current_layer.add_shape(line1);
+//! layer1.add_shape(line1);
 //!
 //! let fill_color_2 = Color::Cmyk(Cmyk::new(0.0, 0.0, 0.0, 0.0, None));
 //! let outline_color_2 = Color::Greyscale(Greyscale::new(0.45, None));
 //!
 //! // More advanced graphical options
-//! current_layer.set_overprint_stroke(true);
-//! current_layer.set_blend_mode(BlendMode::Seperable(SeperableBlendMode::Multiply));
-//! current_layer.set_line_dash_pattern(dash_pattern);
-//! current_layer.set_line_cap_style(LineCapStyle::Round);
+//! let gs = page1.add_graphics_state(
+//!     ExtendedGraphicsStateBuilder::new()
+//!         .with_blend_mode(BlendMode::Seperable(SeperableBlendMode::Multiply))
+//!         .with_overprint_stroke(true)
+//!         .build(),
+//! );
 //!
-//! current_layer.set_fill_color(fill_color_2);
-//! current_layer.set_outline_color(outline_color_2);
-//! current_layer.set_outline_thickness(15.0);
+//! layer1.set_graphics_state(gs);
+//! layer1.set_line_dash_pattern(dash_pattern);
+//! layer1.set_line_cap_style(LineCapStyle::Round);
+//!
+//! layer1.set_fill_color(fill_color_2);
+//! layer1.set_outline_color(outline_color_2);
+//! layer1.set_outline_thickness(15.0);
 //!
 //! // draw second line
-//! current_layer.add_shape(line2);
+//! layer1.add_shape(line2);
+//!
+//! page1.add_layer(layer1);
+//! doc.add_page(page1);
 //! ```
 //!
 //! ### Adding images
@@ -128,8 +146,9 @@
 //! use std::fs::File;
 //!
 //! fn main() {
-//!     let (doc, page1, layer1) = PdfDocument::new("PDF_Document_title", Mm(247.0), Mm(210.0), "Layer 1");
-//!     let current_layer = doc.get_page(page1).get_layer(layer1);
+//!     let mut doc = PdfDocument::new("PDF_Document_title");
+//!     let mut page1 = PdfPage::new(Mm(247.0), Mm(210.0));
+//!     let mut layer1 = PdfLayer::new("Layer 1");
 //!
 //!     // currently, the only reliable file formats are bmp/jpeg/png
 //!     // this is an issue of the image library, not a fault of printpdf
@@ -139,7 +158,7 @@
 //!     // translate x, translate y, rotate, scale x, scale y
 //!     // by default, an image is optimized to 300 DPI (if scale is None)
 //!     // rotations and translations are always in relation to the lower left corner
-//!     image.add_to_layer(current_layer.clone(), None, None, None, None, None, None);
+//!     image.add_to_layer(&mut page1, &mut layer1, None, None, None, None, None, None);
 //!
 //!     // you can also construct images manually from your data:
 //!     let mut image_file_2 = ImageXObject {
@@ -171,8 +190,9 @@
 //! use printpdf::*;
 //! use std::fs::File;
 //!
-//! let (doc, page1, layer1) = PdfDocument::new("PDF_Document_title", Mm(247.0), Mm(210.0), "Layer 1");
-//! let current_layer = doc.get_page(page1).get_layer(layer1);
+//! let mut doc = PdfDocument::new("PDF_Document_title");
+//! let mut page1 = PdfPage::new(Mm(247.0), Mm(210.0));
+//! let mut layer1 = PdfLayer::new("Layer 1");
 //!
 //! let text = "Lorem ipsum";
 //! let text2 = "unicode: стуфхfцчшщъыьэюя";
@@ -181,35 +201,35 @@
 //! let font2 = doc.add_external_font(File::open("assets/fonts/RobotoMedium.ttf").unwrap()).unwrap();
 //!
 //! // text, font size, x from left edge, y from bottom edge, font
-//! current_layer.use_text(text, 48.0, Mm(200.0), Mm(200.0), &font);
+//! layer1.use_text(text, 48.0, Mm(200.0), Mm(200.0), &doc, &font);
 //!
 //! // For more complex layout of text, you can use functions
 //! // defined on the PdfLayerReference
 //! // Make sure to wrap your commands
 //! // in a `begin_text_section()` and `end_text_section()` wrapper
-//! current_layer.begin_text_section();
+//! layer1.begin_text_section();
 //!
 //!     // setup the general fonts.
 //!     // see the docs for these functions for details
-//!     current_layer.set_font(&font2, 33.0);
-//!     current_layer.set_text_cursor(Mm(10.0), Mm(10.0));
-//!     current_layer.set_line_height(33.0);
-//!     current_layer.set_word_spacing(3000.0);
-//!     current_layer.set_character_spacing(10.0);
-//!     current_layer.set_text_rendering_mode(TextRenderingMode::Stroke);
+//!     layer1.set_font(&font2, 33.0);
+//!     layer1.set_text_cursor(Mm(10.0), Mm(10.0));
+//!     layer1.set_line_height(33.0);
+//!     layer1.set_word_spacing(3000.0);
+//!     layer1.set_character_spacing(10.0);
+//!     layer1.set_text_rendering_mode(TextRenderingMode::Stroke);
 //!
 //!     // write two lines (one line break)
-//!     current_layer.write_text(text.clone(), &font2);
-//!     current_layer.add_line_break();
-//!     current_layer.write_text(text2.clone(), &font2);
-//!     current_layer.add_line_break();
+//!     layer1.write_text(text.clone(), &doc, &font2);
+//!     layer1.add_line_break();
+//!     layer1.write_text(text2.clone(), &doc, &font2);
+//!     layer1.add_line_break();
 //!
 //!     // write one line, but write text2 in superscript
-//!     current_layer.write_text(text.clone(), &font2);
-//!     current_layer.set_line_offset(10.0);
-//!     current_layer.write_text(text2.clone(), &font2);
+//!     layer1.write_text(text.clone(), &doc, &font2);
+//!     layer1.set_line_offset(10.0);
+//!     layer1.write_text(text2.clone(), &doc, &font2);
 //!
-//! current_layer.end_text_section();
+//! layer1.end_text_section();
 //! ```
 //!
 //! ## Changelog
@@ -305,104 +325,104 @@
 //! [PDF X/3 technical notes](http://www.pdfxreport.com/lib/exe/fetch.php?media=en:technote_pdfx_checks.pdf)
 
 // Enable clippy if our Cargo.toml file asked us to do so.
-#![cfg_attr(feature="clippy", feature(plugin))]
-#![cfg_attr(feature="clippy", plugin(clippy))]
-
-#![warn(missing_copy_implementations,
-        trivial_numeric_casts,
-        trivial_casts,
-        unused_extern_crates,
-        unused_import_braces,
-        unused_qualifications)]
-
-#![cfg_attr(feature="clippy", warn(cast_possible_truncation))]
-#![cfg_attr(feature="clippy", warn(cast_possible_truncation))]
-#![cfg_attr(feature="clippy", warn(cast_precision_loss))]
-#![cfg_attr(feature="clippy", warn(cast_sign_loss))]
-#![cfg_attr(feature="clippy", warn(missing_docs_in_private_items))]
-#![cfg_attr(feature="clippy", warn(mut_mut))]
-
+#![cfg_attr(feature = "clippy", feature(plugin))]
+#![cfg_attr(feature = "clippy", plugin(clippy))]
+#![warn(
+    missing_copy_implementations,
+    trivial_numeric_casts,
+    trivial_casts,
+    unused_extern_crates,
+    unused_import_braces,
+    unused_qualifications
+)]
+#![cfg_attr(feature = "clippy", warn(cast_possible_truncation))]
+#![cfg_attr(feature = "clippy", warn(cast_possible_truncation))]
+#![cfg_attr(feature = "clippy", warn(cast_precision_loss))]
+#![cfg_attr(feature = "clippy", warn(cast_sign_loss))]
+#![cfg_attr(feature = "clippy", warn(missing_docs_in_private_items))]
+#![cfg_attr(feature = "clippy", warn(mut_mut))]
 // Disallow `println!`. Use `debug!` for debug output
 // (which is provided by the `log` crate).
-#![cfg_attr(feature="clippy", warn(print_stdout))]
-
-#![cfg_attr(all(not(test), feature="clippy"), warn(result_unwrap_used))]
-#![cfg_attr(feature="clippy", warn(unseparated_literal_suffix))]
-#![cfg_attr(feature="clippy", warn(wrong_pub_self_convention))]
+#![cfg_attr(feature = "clippy", warn(print_stdout))]
+#![cfg_attr(all(not(test), feature = "clippy"), warn(result_unwrap_used))]
+#![cfg_attr(feature = "clippy", warn(unseparated_literal_suffix))]
+#![cfg_attr(feature = "clippy", warn(wrong_pub_self_convention))]
 
 #[cfg(feature = "logging")]
-#[macro_use] pub extern crate log;
+#[macro_use]
+pub extern crate log;
 
+#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+extern crate js_sys;
 extern crate lopdf;
 extern crate rusttype;
 extern crate time;
-#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
-extern crate js_sys;
 
 pub mod date;
 #[cfg(feature = "embedded_images")]
 pub extern crate image;
 
-pub mod types;
-pub mod scale;
 pub mod errors;
-pub mod utils;
 mod glob_defines;
 pub mod indices;
+pub mod scale;
+pub mod types;
+pub mod utils;
 
 pub use self::errors::Error;
+pub use self::errors::IndexError;
 pub use self::errors::PdfError;
 pub use date::*;
-pub use self::errors::IndexError;
 pub use rusttype::Error as RusttypeError;
 
 pub use self::scale::{Mm, Pt, Px};
 pub use self::types::pdf_conformance::{CustomPdfConformance, PdfConformance};
-pub use self::types::pdf_document::{PdfDocumentReference, PdfDocument};
+pub use self::types::pdf_document::PdfDocument;
+pub use self::types::pdf_layer::PdfLayer;
 pub use self::types::pdf_metadata::PdfMetadata;
-pub use self::types::pdf_page::{PdfPage, PdfPageReference};
-pub use self::types::pdf_layer::{PdfLayer, PdfLayerReference};
+pub use self::types::pdf_page::PdfPage;
 
-pub use self::types::plugins::xmp::xmp_metadata::XmpMetadata;
 pub use self::types::plugins::misc::document_info::DocumentInfo;
+pub use self::types::plugins::xmp::xmp_metadata::XmpMetadata;
 
 /// Stub module for 3D content in a PDF
 pub use self::types::plugins::graphics::three_dimensional;
 pub use self::types::plugins::graphics::two_dimensional::font::{
-    Font, BuiltinFont, ExternalFont, TextRenderingMode, IndirectFontRef, DirectFontRef, FontList
+    BuiltinFont, DirectFontRef, ExternalFont, Font, FontList, IndirectFontRef, TextRenderingMode,
 };
 pub use self::types::plugins::graphics::two_dimensional::image::Image;
 pub use self::types::plugins::graphics::two_dimensional::line::Line;
 pub use self::types::plugins::graphics::two_dimensional::point::Point;
 
 pub use self::types::plugins::graphics::color::{
-    Color, Rgb, Cmyk, Greyscale, SpotColor, PdfColor, ColorSpace, ColorBits
+    Cmyk, Color, ColorBits, ColorSpace, Greyscale, PdfColor, Rgb, SpotColor,
 };
 pub use self::types::plugins::graphics::ctm::{CurTransMat, TextMatrix};
 pub use self::types::plugins::graphics::extgstate::{
-    ExtendedGraphicsState, ExtendedGraphicsStateList, ExtendedGraphicsStateRef, ExtendedGraphicsStateBuilder,
-    OverprintMode, BlackGenerationFunction, BlackGenerationExtraFunction, UnderColorRemovalFunction,
-    UnderColorRemovalExtraFunction, TransferFunction, TransferExtraFunction, HalftoneType,
-    SpotFunction, BlendMode, SeperableBlendMode, NonSeperableBlendMode, RenderingIntent, SoftMask,
-    SoftMaskFunction, LineJoinStyle, LineCapStyle, LineDashPattern,
+    BlackGenerationExtraFunction, BlackGenerationFunction, BlendMode, ExtendedGraphicsState,
+    ExtendedGraphicsStateBuilder, ExtendedGraphicsStateList, ExtendedGraphicsStateRef,
+    HalftoneType, LineCapStyle, LineDashPattern, LineJoinStyle, NonSeperableBlendMode,
+    OverprintMode, RenderingIntent, SeperableBlendMode, SoftMask, SoftMaskFunction, SpotFunction,
+    TransferExtraFunction, TransferFunction, UnderColorRemovalExtraFunction,
+    UnderColorRemovalFunction,
 };
 pub use self::types::plugins::graphics::icc_profile::{
-    IccProfileType, IccProfile, IccProfileRef, IccProfileList
+    IccProfile, IccProfileList, IccProfileRef, IccProfileType,
 };
 pub use self::types::plugins::graphics::ocg::{OCGList, OCGRef};
-pub use self::types::plugins::graphics::pattern::{Pattern, PatternRef, PatternList};
+pub use self::types::plugins::graphics::pattern::{Pattern, PatternList, PatternRef};
 pub use self::types::plugins::graphics::pdf_resources::PdfResources;
 pub use self::types::plugins::graphics::xobject::{
-    XObject, XObjectList, XObjectRef, ImageXObject, ImageXObjectRef,
-    ImageFilter, FormXObject, FormXObjectRef, FormType, SMask, GroupXObject,
-    GroupXObjectType, ReferenceXObject, OptionalContentGroup, OCGIntent, PostScriptXObject,
+    FormType, FormXObject, FormXObjectRef, GroupXObject, GroupXObjectType, ImageFilter,
+    ImageXObject, ImageXObjectRef, OCGIntent, OptionalContentGroup, PostScriptXObject,
+    ReferenceXObject, SMask, XObject, XObjectList, XObjectRef,
 };
 
+/// Stub module for interactive (JavaScript) content, embedded in PDF files
+pub use self::types::plugins::interactive;
 /// Stub module for future audio embedding implementation
 pub use self::types::plugins::media::audio;
 /// Stub module for future video embedding implementation
 pub use self::types::plugins::media::video;
-/// Stub module for interactive (JavaScript) content, embedded in PDF files
-pub use self::types::plugins::interactive;
 /// Stub module for encryption (passwords). Not implemented yet.
 pub use self::types::plugins::security;

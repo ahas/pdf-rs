@@ -1,6 +1,5 @@
 target/*
 ./*.pdf
-./test_
-test_
 .vscode/*
 .cargo/*
+test_*.pdf

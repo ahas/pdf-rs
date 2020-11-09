@@ -1,10 +1,11 @@
 //! Abstraction class for images.
 //! Please use this class instead of adding `ImageXObjects` yourself
 
-#[cfg(feature = "embedded_images")]
 use image::{self, DynamicImage, ImageDecoder};
+use ImageXObject;
 use Mm;
-use {ImageXObject, PdfLayerReference};
+use PdfLayer;
+use PdfPage;
 
 /// Image - wrapper around an `ImageXObject` to allow for more control
 /// within the library
@@ -45,7 +46,8 @@ impl Image {
     #[cfg_attr(feature = "cargo-clippy", allow(too_many_arguments))]
     pub fn add_to_layer(
         self,
-        layer: PdfLayerReference,
+        page: &mut PdfPage,
+        layer: &mut PdfLayer,
         translate_x: Option<Mm>,
         translate_y: Option<Mm>,
         rotate_cw: Option<f64>,
@@ -61,13 +63,20 @@ impl Image {
         let image_w = self.image.width.into_pt(dpi);
         let image_h = self.image.height.into_pt(dpi);
 
-        let image = layer.add_image(self.image);
+        let image = page.add_image(self.image);
 
         let scale_x = scale_x.unwrap_or(1.);
         let scale_y = scale_y.unwrap_or(1.);
         let image_w = Some(image_w.0 * scale_x);
         let image_h = Some(image_h.0 * scale_y);
 
-        layer.use_xobject(image, translate_x, translate_y, rotate_cw, image_w, image_h);
+        layer.use_xobject(
+            &image,
+            translate_x,
+            translate_y,
+            rotate_cw,
+            image_w,
+            image_h,
+        );
     }
 }

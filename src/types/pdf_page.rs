@@ -1,20 +1,16 @@
 //! PDF page management
 
 use lopdf;
-use std::rc::Weak;
-use std::cell::RefCell;
+use ImageXObject;
 
-use indices::{PdfPageIndex, PdfLayerIndex};
 use {
-    PdfResources, PdfLayer, PdfDocument, ExtendedGraphicsState, ExtendedGraphicsStateRef, Pattern, XObject, XObjectRef,
-    PdfLayerReference, PatternRef, Mm, Pt
+    ExtendedGraphicsState, ExtendedGraphicsStateRef, Mm, Pattern, PatternRef, PdfLayer,
+    PdfResources, Pt, XObject, XObjectRef,
 };
 
 /// PDF page
 #[derive(Debug, Clone)]
 pub struct PdfPage {
-    /// The index of the page in the document
-    pub(crate) index: usize,
     /// page width in point
     pub width: Pt,
     /// page height in point
@@ -25,40 +21,16 @@ pub struct PdfPage {
     pub(crate) resources: PdfResources,
 }
 
-/// A "reference" to the current page, allows for inner mutability
-/// but only inside this library
-pub struct PdfPageReference {
-    /// A weak reference to the document, for inner mutability
-    pub document: Weak<RefCell<PdfDocument>>,
-    /// The index of the page this layer is on
-    pub page: PdfPageIndex,
-}
-
 impl PdfPage {
-
     /// Create a new page, notice that width / height are in millimeter.
     /// Page must contain at least one layer
-    #[inline]
-    pub fn new<S>(width: Mm,
-                  height: Mm,
-                  layer_name: S,
-                  page_index: usize)
-    -> (Self, PdfLayerIndex) where S: Into<String>
-    {
-        let mut page = Self {
-            index: page_index,
+    pub fn new(width: Mm, height: Mm) -> Self {
+        Self {
             width: width.into(),
             height: height.into(),
             layers: Vec::new(),
             resources: PdfResources::new(),
-        };
-
-        let initial_layer = PdfLayer::new(layer_name);
-        page.layers.push(initial_layer);
-
-        let layer_index = page.layers.len() - 1;
-
-        (page, PdfLayerIndex(layer_index))
+        }
     }
 
     /// Iterates through the layers attached to this page and gathers all resources,
@@ -73,11 +45,15 @@ impl PdfPage {
     /// to the document on a document level, it should contain the indices of the layers
     /// (they will be ignored, todo) and references to the actual OCG dictionaries
     #[inline]
-    pub(crate) fn collect_resources_and_streams(self, doc: &mut lopdf::Document, layers: &[(usize, lopdf::Object)])
-    -> (lopdf::Dictionary, Vec<lopdf::Stream>)
-    {
+    pub(crate) fn collect_resources_and_streams(
+        self,
+        doc: &mut lopdf::Document,
+        layers: &[(usize, lopdf::Object)],
+    ) -> (lopdf::Dictionary, Vec<lopdf::Stream>) {
         let cur_layers = layers.iter().map(|l| l.1.clone()).collect();
-        let (resource_dictionary, ocg_refs) = self.resources.into_with_document_and_layers(doc, cur_layers);
+        let (resource_dictionary, ocg_refs) = self
+            .resources
+            .into_with_document_and_layers(doc, cur_layers);
 
         // set contents
         let mut layer_streams = Vec::<lopdf::Stream>::new();
@@ -85,13 +61,17 @@ impl PdfPage {
         use lopdf::Object::*;
 
         for (idx, mut layer) in self.layers.into_iter().enumerate() {
-
             // push OCG and q to the beginning of the layer
-            layer.operations.insert(0, Operation::new("q".into(), vec![]));
-            layer.operations.insert(0, Operation::new("BDC".into(), vec![
-                Name("OC".into()),
-                Name(ocg_refs[idx].name.clone().into())
-            ]));
+            layer
+                .operations
+                .insert(0, Operation::new("q".into(), vec![]));
+            layer.operations.insert(
+                0,
+                Operation::new(
+                    "BDC".into(),
+                    vec![Name("OC".into()), Name(ocg_refs[idx].name.clone().into())],
+                ),
+            );
 
             // push OCG END and Q to the end of the layer stream
             layer.operations.push(Operation::new("Q".into(), vec![]));
@@ -119,68 +99,40 @@ impl PdfPage {
     /// Returns the old graphics state, in case it was overwritten, as well as a reference
     /// to the currently active graphics state
     #[inline]
-    pub fn add_graphics_state(&mut self, added_state: ExtendedGraphicsState)
-    -> ExtendedGraphicsStateRef
-    {
+    pub fn add_graphics_state(
+        &mut self,
+        added_state: ExtendedGraphicsState,
+    ) -> ExtendedGraphicsStateRef {
         self.resources.add_graphics_state(added_state)
     }
 
     /// __STUB__: Adds a pattern to the pages resources
     #[inline]
-    pub fn add_pattern(&mut self, pattern: Pattern)
-    -> PatternRef
-    {
+    pub fn add_pattern(&mut self, pattern: Pattern) -> PatternRef {
         self.resources.add_pattern(pattern)
     }
 
     /// __STUB__: Adds an XObject to the pages resources.
     /// __NOTE__: Watch out for scaling. Your XObject might be invisible or only 1pt x 1pt big
     #[inline]
-    pub fn add_xobject(&mut self, xobj: XObject)
-    -> XObjectRef
-    {
+    pub fn add_xobject(&mut self, xobj: XObject) -> XObjectRef {
         self.resources.add_xobject(xobj)
     }
-}
 
-impl PdfPageReference {
-
-    /// Adds a page and returns the index of the currently added page
+    /// Add a layer on top of this page.
     #[inline]
-    pub fn add_layer<S>(&self, layer_name: S)
-    -> PdfLayerReference where S: Into<String>
-    {
-        let doc = self.document.upgrade().unwrap();
-        let mut doc = doc.borrow_mut();
-        let page = &mut doc.pages[self.page.0];
+    pub fn add_layer(&mut self, layer: PdfLayer) {
+        // TODO: validate used resources.
 
-        let current_page_index = page.layers.len(); /* order is important */
-        let layer = PdfLayer::new(layer_name);
-        page.layers.push(layer);
-        let index = PdfLayerIndex(current_page_index);
-
-        PdfLayerReference {
-            document: self.document.clone(),
-            page: self.page,
-            layer: index,
-        }
+        self.layers.push(layer);
     }
 
-    /// Validates that a layer is present and returns a reference to it
-    #[inline]
-    #[cfg_attr(feature = "cargo-clippy", allow(no_effect))]
-    pub fn get_layer(&self, layer: PdfLayerIndex)
-    -> PdfLayerReference
+    /// Add an image object to the page
+    /// To be called from the `image.add_to_layer()` class (see `use_xobject` documentation)
+    pub(crate) fn add_image<T>(&mut self, image: T) -> XObjectRef
+    where
+        T: Into<ImageXObject>,
     {
-        let doc = self.document.upgrade().unwrap();
-        let doc = doc.borrow();
-
-        let _ = &doc.pages[self.page.0].layers[layer.0];
-
-        PdfLayerReference {
-            document: self.document.clone(),
-            page: self.page,
-            layer: layer,
-        }
+        self.add_xobject(XObject::Image(image.into()))
     }
 }
