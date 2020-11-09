@@ -2,7 +2,7 @@
 //! Please use this class instead of adding `ImageXObjects` yourself
 
 #[cfg(feature = "embedded_images")]
-use image::{self, ImageDecoder, DynamicImage};
+use image::{self, DynamicImage, ImageDecoder};
 use Mm;
 use {ImageXObject, PdfLayerReference};
 
@@ -15,30 +15,19 @@ pub struct Image {
 }
 
 impl From<ImageXObject> for Image {
-    fn from(image: ImageXObject)
-    -> Self
-    {
-        Self {
-            image,
-        }
+    fn from(image: ImageXObject) -> Self {
+        Self { image }
     }
-
 }
 
 #[cfg(feature = "embedded_images")]
 impl<'a> Image {
-    pub fn try_from<T: ImageDecoder<'a>>(image: T)
-    -> Result<Self, image::ImageError>
-    {
+    pub fn try_from<T: ImageDecoder<'a>>(image: T) -> Result<Self, image::ImageError> {
         let image = ImageXObject::try_from(image)?;
-        Ok(Self {
-            image,
-        })
+        Ok(Self { image })
     }
 
-    pub fn from_dynamic_image(image: &DynamicImage)
-    -> Self
-    {
+    pub fn from_dynamic_image(image: &DynamicImage) -> Self {
         Self {
             image: ImageXObject::from_dynamic_image(image),
         }
@@ -46,7 +35,6 @@ impl<'a> Image {
 }
 
 impl Image {
-
     /// Adds the image to a specific layer and consumes it
     /// This is due to a PDF weirdness - images are basically just "names"
     /// and you have to make sure that they are added to the same page
@@ -55,12 +43,16 @@ impl Image {
     /// You can use the "dpi" parameter to specify a scaling - the default is 300dpi
     ///
     #[cfg_attr(feature = "cargo-clippy", allow(too_many_arguments))]
-    pub fn add_to_layer(self, layer: PdfLayerReference,
-                        translate_x: Option<Mm>, translate_y: Option<Mm>,
-                        rotate_cw: Option<f64>,
-                        scale_x: Option<f64>, scale_y: Option<f64>,
-                        dpi: Option<f64>)
-    {
+    pub fn add_to_layer(
+        self,
+        layer: PdfLayerReference,
+        translate_x: Option<Mm>,
+        translate_y: Option<Mm>,
+        rotate_cw: Option<f64>,
+        scale_x: Option<f64>,
+        scale_y: Option<f64>,
+        dpi: Option<f64>,
+    ) {
         // PDF maps an image to a 1x1 square, we have to adjust the transform matrix
         // to fix the distortion
         let dpi = dpi.unwrap_or(300.0);
