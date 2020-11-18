@@ -1,12 +1,9 @@
 //! PDF page management
 
 use lopdf;
-use ImageXObject;
+use types;
 
-use {
-    ExtendedGraphicsState, ExtendedGraphicsStateRef, Mm, Pattern, PatternRef, PdfLayer,
-    PdfResources, Pt, XObject, XObjectRef,
-};
+use {Embeddable, Embedded, Mm, Pattern, PatternRef, PdfLayer, PdfResources, Pt, Registered};
 
 /// PDF page
 #[derive(Debug, Clone)]
@@ -19,6 +16,8 @@ pub struct PdfPage {
     pub layers: Vec<PdfLayer>,
     /// Resources used in this page
     pub(crate) resources: PdfResources,
+    /// Resources used in this page
+    pub(crate) resources_dict: lopdf::Dictionary,
 }
 
 impl PdfPage {
@@ -30,7 +29,12 @@ impl PdfPage {
             height: height.into(),
             layers: Vec::new(),
             resources: PdfResources::new(),
+            resources_dict: lopdf::Dictionary::new(),
         }
+    }
+
+    pub fn register<T: Embeddable + Clone>(&mut self, resource: &Embedded<T>) -> Registered<T> {
+        types::pdf_resources::register(&mut self.resources_dict, resource)
     }
 
     /// Iterates through the layers attached to this page and gathers all resources,
@@ -47,13 +51,24 @@ impl PdfPage {
     #[inline]
     pub(crate) fn collect_resources_and_streams(
         self,
-        doc: &mut lopdf::Document,
         layers: &[(usize, lopdf::Object)],
     ) -> (lopdf::Dictionary, Vec<lopdf::Stream>) {
         let cur_layers = layers.iter().map(|l| l.1.clone()).collect();
-        let (resource_dictionary, ocg_refs) = self
-            .resources
-            .into_with_document_and_layers(doc, cur_layers);
+        let (mut resource_dictionary, ocg_refs) = self.resources.into_with_layers(cur_layers);
+
+        // register resources
+        for (key, set) in self.resources_dict.into_iter() {
+            let set = set.as_dict().unwrap();
+            if let Some(dict) = resource_dictionary
+                .get_mut(&key)
+                .and_then(|o| o.as_dict_mut())
+                .ok()
+            {
+                dict.extend(set);
+            } else {
+                resource_dictionary.set(key.clone(), set.clone())
+            }
+        }
 
         // set contents
         let mut layer_streams = Vec::<lopdf::Stream>::new();
@@ -92,31 +107,10 @@ impl PdfPage {
         (resource_dictionary, layer_streams)
     }
 
-    /// Change the graphics state. Before this operation is done, you should save
-    /// the graphics state using the `save_graphics_state()` function. This will change the
-    /// current graphics state until the end of the page or until the page is reset to the
-    /// previous state.
-    /// Returns the old graphics state, in case it was overwritten, as well as a reference
-    /// to the currently active graphics state
-    #[inline]
-    pub fn add_graphics_state(
-        &mut self,
-        added_state: ExtendedGraphicsState,
-    ) -> ExtendedGraphicsStateRef {
-        self.resources.add_graphics_state(added_state)
-    }
-
     /// __STUB__: Adds a pattern to the pages resources
     #[inline]
     pub fn add_pattern(&mut self, pattern: Pattern) -> PatternRef {
         self.resources.add_pattern(pattern)
-    }
-
-    /// __STUB__: Adds an XObject to the pages resources.
-    /// __NOTE__: Watch out for scaling. Your XObject might be invisible or only 1pt x 1pt big
-    #[inline]
-    pub fn add_xobject(&mut self, xobj: XObject) -> XObjectRef {
-        self.resources.add_xobject(xobj)
     }
 
     /// Add a layer on top of this page.
@@ -125,14 +119,5 @@ impl PdfPage {
         // TODO: validate used resources.
 
         self.layers.push(layer);
-    }
-
-    /// Add an image object to the page
-    /// To be called from the `image.add_to_layer()` class (see `use_xobject` documentation)
-    pub(crate) fn add_image<T>(&mut self, image: T) -> XObjectRef
-    where
-        T: Into<ImageXObject>,
-    {
-        self.add_xobject(XObject::Image(image.into()))
     }
 }

@@ -12,16 +12,18 @@ fn main() {
         requires_xmp_metadata: false,
         ..Default::default()
     }));
+    let font: Font = BuiltinFont::TimesBoldItalic.into();
+    let font = doc.embed(&font).unwrap();
 
     let mut page = PdfPage::new(Mm(500.0), Mm(300.0));
+    let font = page.register(&font);
 
     {
         let mut layer = PdfLayer::new("Layer 1");
 
         let text = "Lorem ipsum";
 
-        let font = doc.add_builtin_font(BuiltinFont::TimesBoldItalic).unwrap();
-        layer.use_text(text, 48.0, Mm(10.0), Mm(200.0), &doc, &font);
+        layer.use_text(text, 48.0, Mm(10.0), Mm(200.0), &font);
 
         page.add_layer(layer);
     }

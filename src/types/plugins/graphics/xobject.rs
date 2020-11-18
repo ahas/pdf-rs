@@ -5,8 +5,7 @@ use crate::OffsetDateTime;
 #[cfg(feature = "embedded_images")]
 use image::{DynamicImage, GenericImageView, ImageDecoder, ImageError};
 use lopdf;
-use std::collections::HashMap;
-use {ColorBits, ColorSpace, CurTransMat, Px};
+use {ColorBits, ColorSpace, CurTransMat, Embeddable, Px};
 
 /* Parent: Resources dictionary of the page */
 /// External object that gets reference outside the PDF content stream
@@ -55,59 +54,6 @@ impl Into<lopdf::Object> for XObject {
     }
 }
 
-/// List of `XObjects`
-#[derive(Debug, Default, Clone)]
-pub struct XObjectList {
-    objects: HashMap<String, XObject>,
-}
-
-impl XObjectList {
-    /// Creates a new XObjectList
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Adds a new XObject to the list
-    pub fn add_xobject(&mut self, xobj: XObject) -> XObjectRef {
-        let len = self.objects.len();
-        let xobj_ref = XObjectRef::new(len);
-        self.objects.insert(xobj_ref.name.clone(), xobj);
-        xobj_ref
-    }
-
-    /// Same as `Into<lopdf::Dictionary>`, but since the dictionary
-    /// items in an XObject dictionary are streams and must be added to
-    /// the document as __references__, this function needs an additional
-    /// access to the PDF document so that we can add the streams first and
-    /// then track the references to them.
-    #[cfg_attr(feature = "cargo-clippy", allow(needless_return))]
-    pub fn into_with_document(self, doc: &mut lopdf::Document) -> lopdf::Dictionary {
-        self.objects
-            .into_iter()
-            .map(|(name, object)| {
-                let obj: lopdf::Object = object.into();
-                let obj_ref = doc.add_object(obj);
-                (name.to_string(), lopdf::Object::Reference(obj_ref))
-            })
-            .collect()
-    }
-}
-
-/// Named reference to an `XObject`
-#[derive(Debug, Clone)]
-pub struct XObjectRef {
-    pub(crate) name: String,
-}
-
-impl XObjectRef {
-    /// Creates a new reference from a number
-    pub fn new(index: usize) -> Self {
-        Self {
-            name: format!("X{}", index),
-        }
-    }
-}
-
 /* todo: inline images? (icons, logos, etc.) */
 /* todo: JPXDecode filter */
 
@@ -133,6 +79,8 @@ pub struct ImageXObject {
     /// Required bounds to clip the image, in unit space
     /// Default value: Identity matrix (`[1 0 0 1 0 0]`) - used when value is `None`
     pub clipping_bbox: Option<CurTransMat>,
+    /// Soft mask
+    pub soft_mask: Option<SMask>,
 }
 
 impl<'a> ImageXObject {
@@ -158,6 +106,7 @@ impl<'a> ImageXObject {
             image_data: data,
             image_filter,
             clipping_bbox: bbox,
+            soft_mask: None,
         }
     }
 
@@ -191,6 +140,7 @@ impl<'a> ImageXObject {
             interpolate: true,
             image_filter: None,
             clipping_bbox: None,
+            soft_mask: None,
         })
     }
 
@@ -211,6 +161,7 @@ impl<'a> ImageXObject {
             interpolate: true,
             image_filter: None,
             clipping_bbox: None,
+            soft_mask: None,
         }
     }
 }
@@ -260,10 +211,81 @@ impl Into<lopdf::Stream> for ImageXObject {
     }
 }
 
-/// Named reference to an image
-#[derive(Debug)]
-pub struct ImageXObjectRef {
-    name: String,
+impl Embeddable for ImageXObject {
+    const KEY: &'static str = "XObject";
+
+    fn embed(&self, doc: &mut lopdf::Document) -> lopdf::Result<lopdf::ObjectId> {
+        // TODO: All of this can be precalculated.
+        use lopdf::Object::*;
+        use std::iter::FromIterator;
+
+        let cs: &'static str = self.color_space.into();
+        let bbox: lopdf::Object = self.clipping_bbox.unwrap_or(CurTransMat::Identity).into();
+
+        let mut dict = lopdf::Dictionary::from_iter(vec![
+            ("Type", Name("XObject".as_bytes().to_vec())),
+            ("Subtype", Name("Image".as_bytes().to_vec())),
+            ("Width", Integer(self.width.0 as i64)),
+            ("Height", Integer(self.height.0 as i64)),
+            ("Interpolate", self.interpolate.into()),
+            ("BitsPerComponent", Integer(self.bits_per_component.into())),
+            ("ColorSpace", Name(cs.as_bytes().to_vec())),
+            ("BBox", bbox),
+        ]);
+
+        if let Some(soft_mask) = &self.soft_mask {
+            let soft_mask = crate::types::pdf_resources::embed(doc, soft_mask)?;
+            dict.set("SMask", soft_mask.object_id);
+        }
+
+        if let Some(filter) = self.image_filter {
+            let params = match filter {
+                // TODO technically we could use multiple filters,
+                // DCT as an exception!
+                ImageFilter::DCT => {
+                    vec![
+                        ("Filter", Array(vec![Name("DCTDecode".as_bytes().to_vec())])),
+                        // not necessary, unless missing in the jpeg header
+                        (
+                            "DecodeParams",
+                            Dictionary(lopdf::dictionary!("ColorTransform" => Integer(0))),
+                        ),
+                    ]
+                }
+                ImageFilter::Lzw => {
+                    vec![
+                        ("Filter", Array(vec![Name("LZWDecode".as_bytes().to_vec())])),
+                        // not necessary, unless missing in the jpeg header
+                        // (
+                        //     "DecodeParams",
+                        //     Dictionary(lopdf::dictionary!("EarlyChange" => Integer(0))),
+                        // ),
+                    ]
+                }
+                ImageFilter::Flate => {
+                    vec![
+                        (
+                            "Filter",
+                            Array(vec![Name("FlateDecode".as_bytes().to_vec())]),
+                        ),
+                        // not necessary, unless missing in the jpeg header
+                        // (
+                        //     "DecodeParams",
+                        //     Dictionary(lopdf::dictionary!("EarlyChange" => Integer(0))),
+                        // ),
+                    ]
+                }
+                _ => unimplemented!("Encountered filter type is not supported"),
+            };
+
+            params
+                .into_iter()
+                .for_each(|param| dict.set(param.0, param.1));
+        }
+
+        let stream = lopdf::Stream::new(dict, self.image_data.clone());
+        Ok(doc.add_object(stream))
+    }
 }
 
 /// Describes the format the image bytes are compressed with.
@@ -277,6 +299,8 @@ pub enum ImageFilter {
     DCT,
     /// JPEG2000 aka JPX wavelet based compression.
     JPX,
+    /// DEFLATE
+    Flate,
 }
 
 /// __THIS IS NOT A PDF FORM!__ A form `XObject` can be nearly everything.
@@ -461,7 +485,7 @@ impl Into<i64> for FormType {
 /* Parent: XObject with /Subtype /Image */
 /// `SMask` dictionary. A soft mask (or `SMask`) is a greyscale image
 /// that is used to mask another image
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SMask {
     /* /Type /XObject */
     /* /Subtype /Image */
@@ -479,15 +503,89 @@ pub struct SMask {
     /* /OPI (ignored, don't set) */
     /// If `self.matte` is set to true, this entry must be the same
     /// width as the parent image. If not, the `SMask` is resampled to the parent unit square
-    pub width: i64,
+    pub width: Px,
     /// See width
-    pub height: i64,
+    pub height: Px,
     /* /Interpolate (optional, set to true)*/
     pub interpolate: bool,
     /// Bits per component, required (warning: this is a grayscale image)
-    pub bits_per_component: i64,
+    pub bits_per_component: ColorBits,
     /// Vec of component values
     pub matte: Vec<i64>,
+    /// The actual data from the image
+    pub image_data: Vec<u8>,
+    /// Decompression filter for `image_data`, if `None` assumes uncompressed raw pixels in the expected color format.
+    pub image_filter: Option<ImageFilter>,
+}
+
+impl Embeddable for SMask {
+    const KEY: &'static str = "NEVER";
+
+    fn embed(&self, doc: &mut lopdf::Document) -> lopdf::Result<lopdf::ObjectId> {
+        // TODO: All of this can be precalculated.
+        use lopdf::Object::*;
+        use std::iter::FromIterator;
+
+        let cs: &'static str = ColorSpace::Greyscale.into();
+
+        let mut dict = lopdf::Dictionary::from_iter(vec![
+            ("Type", Name("XObject".as_bytes().to_vec())),
+            ("Subtype", Name("Image".as_bytes().to_vec())),
+            ("Width", Integer(self.width.0 as i64)),
+            ("Height", Integer(self.height.0 as i64)),
+            ("Interpolate", self.interpolate.into()),
+            ("BitsPerComponent", Integer(self.bits_per_component.into())),
+            ("ColorSpace", Name(cs.as_bytes().to_vec())),
+        ]);
+
+        if let Some(filter) = self.image_filter {
+            let params = match filter {
+                // TODO technically we could use multiple filters,
+                // DCT as an exception!
+                ImageFilter::DCT => {
+                    vec![
+                        ("Filter", Array(vec![Name("DCTDecode".as_bytes().to_vec())])),
+                        // not necessary, unless missing in the jpeg header
+                        (
+                            "DecodeParams",
+                            Dictionary(lopdf::dictionary!("ColorTransform" => Integer(0))),
+                        ),
+                    ]
+                }
+                ImageFilter::Lzw => {
+                    vec![
+                        ("Filter", Array(vec![Name("LZWDecode".as_bytes().to_vec())])),
+                        // not necessary, unless missing in the jpeg header
+                        // (
+                        //     "DecodeParams",
+                        //     Dictionary(lopdf::dictionary!("EarlyChange" => Integer(0))),
+                        // ),
+                    ]
+                }
+                ImageFilter::Flate => {
+                    vec![
+                        (
+                            "Filter",
+                            Array(vec![Name("FlateDecode".as_bytes().to_vec())]),
+                        ),
+                        // not necessary, unless missing in the jpeg header
+                        // (
+                        //     "DecodeParams",
+                        //     Dictionary(lopdf::dictionary!("EarlyChange" => Integer(0))),
+                        // ),
+                    ]
+                }
+                _ => unimplemented!("Encountered filter type is not supported"),
+            };
+
+            params
+                .into_iter()
+                .for_each(|param| dict.set(param.0, param.1));
+        }
+
+        let stream = lopdf::Stream::new(dict, self.image_data.clone());
+        Ok(doc.add_object(stream))
+    }
 }
 
 // in the PDF content stream, reference an XObject like this

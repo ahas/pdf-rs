@@ -18,10 +18,12 @@ fn main() {
     let mut reader = Cursor::new(image_bytes.as_ref());
 
     let decoder = BmpDecoder::new(&mut reader).unwrap();
-    let image2 = Image::try_from(decoder).unwrap();
+    let image = Image::try_from(decoder).unwrap();
+    let image = doc.embed(&image).unwrap();
+    let image = page.register(&image);
 
     // layer,
-    image2.add_to_layer(&mut page, &mut layer, None, None, None, None, None, None);
+    layer.use_image(&image, None, None, None, None, None, None);
 
     page.add_layer(layer);
     doc.add_page(page);

@@ -1,13 +1,14 @@
 //! PDF layer management. Layers can contain referenced or real content.
 
 use lopdf;
+use std::borrow::Borrow;
+use types::RegisteredXObject;
 
 use glob_defines::OP_PATH_STATE_SET_LINE_WIDTH;
 use lopdf::content::Operation;
 use {
-    Color, CurTransMat, ExtendedGraphicsStateRef, Font, IndirectFontRef, Line, LineCapStyle,
-    LineDashPattern, LineJoinStyle, Mm, PdfColor, PdfDocument, Pt, TextMatrix, TextRenderingMode,
-    XObjectRef,
+    Color, CurTransMat, ExtendedGraphicsState, Font, Image, Line, LineCapStyle, LineDashPattern,
+    LineJoinStyle, Mm, PdfColor, Pt, Registered, TextMatrix, TextRenderingMode,
 };
 
 /// One layer of PDF data
@@ -78,10 +79,13 @@ impl PdfLayer {
     /// Set the current font, only valid in a `begin_text_section` to
     /// `end_text_section` block
     #[inline]
-    pub fn set_font(&mut self, font: &IndirectFontRef, font_size: f64) -> () {
+    pub fn set_font<F>(&mut self, font: &Registered<F>, font_size: f64) -> ()
+    where
+        F: Borrow<Font>,
+    {
         self.internal_add_operation(Operation::new(
             "Tf",
-            vec![font.name.clone().into(), (font_size).into()],
+            vec![format!("R{}", font.name_index).into(), (font_size).into()],
         ));
     }
 
@@ -101,7 +105,7 @@ impl PdfLayer {
     /// Function is limited to this library to ensure that outside code cannot call it
     pub(crate) fn use_xobject(
         &mut self,
-        xobj: &XObjectRef,
+        xobj: impl RegisteredXObject,
         translate_x: Option<Mm>,
         translate_y: Option<Mm>,
         rotate_cw: Option<f64>,
@@ -146,19 +150,52 @@ impl PdfLayer {
         }
 
         // invoke object
-        self.internal_invoke_xobject(xobj.name.clone());
+        self.internal_add_operation(lopdf::content::Operation::new(
+            "Do",
+            vec![lopdf::Object::Name(xobj.xobject_name())],
+        ));
 
         // restore graphics state
         self.restore_graphics_state();
     }
 
+    pub fn use_image<I>(
+        &mut self,
+        image: &Registered<I>,
+        translate_x: Option<Mm>,
+        translate_y: Option<Mm>,
+        rotate_cw: Option<f64>,
+        scale_x: Option<f64>,
+        scale_y: Option<f64>,
+        dpi: Option<f64>,
+    ) where
+        I: Borrow<Image>,
+    {
+        // PDF maps an image to a 1x1 square, we have to adjust the transform matrix
+        // to fix the distortion
+        let dpi = dpi.unwrap_or(300.0);
+
+        //Image at the given dpi should 1px = 1pt
+        let image_w = image.object.borrow().image.width.into_pt(dpi);
+        let image_h = image.object.borrow().image.height.into_pt(dpi);
+
+        let scale_x = scale_x.unwrap_or(1.);
+        let scale_y = scale_y.unwrap_or(1.);
+        let image_w = Some(image_w.0 * scale_x);
+        let image_h = Some(image_h.0 * scale_y);
+
+        self.use_xobject(image, translate_x, translate_y, rotate_cw, image_w, image_h)
+    }
+
     /// Change the graphics state of the current layer
-    pub fn set_graphics_state(&mut self, graphics_state: ExtendedGraphicsStateRef) {
+    pub fn set_graphics_state<S>(&mut self, graphics_state: &Registered<S>)
+    where
+        S: Borrow<ExtendedGraphicsState>,
+    {
+        let name = format!("R{}", graphics_state.name_index);
         self.internal_add_operation(Operation::new(
             "gs",
-            vec![lopdf::Object::Name(
-                graphics_state.gs_name.as_bytes().to_vec(),
-            )],
+            vec![lopdf::Object::Name(name.as_bytes().to_vec())],
         ));
     }
 
@@ -332,9 +369,10 @@ impl PdfLayer {
     ///
     /// [Windows-1252]: https://en.wikipedia.org/wiki/Windows-1252
     #[inline]
-    pub fn write_text<S>(&mut self, text: S, doc: &PdfDocument, font: &IndirectFontRef) -> ()
+    pub fn write_text<S, F>(&mut self, text: S, font: &Registered<F>) -> ()
     where
         S: Into<String>,
+        F: Borrow<Font>,
     {
         // NOTE: The unwrap() calls in this function are safe, since
         // we've already checked the font for validity when it was added to the document
@@ -356,7 +394,7 @@ impl PdfLayer {
             use rusttype::Codepoint as Cp;
             use rusttype::FontCollection;
 
-            if let Font::ExternalFont(face_direct_ref) = doc.fonts.get_font(font).unwrap().data {
+            if let Font::ExternalFont(face_direct_ref) = font.object.borrow() {
                 let mut list_gid = Vec::<u16>::new();
                 let collection = FontCollection::from_bytes(&*face_direct_ref.font_bytes).unwrap();
                 let font = collection
@@ -410,31 +448,23 @@ impl PdfLayer {
     ///
     /// [Windows-1252]: https://en.wikipedia.org/wiki/Windows-1252
     #[inline]
-    pub fn use_text<S>(
+    pub fn use_text<S, F>(
         &mut self,
         text: S,
         font_size: f64,
         x: Mm,
         y: Mm,
-        doc: &PdfDocument,
-        font: &IndirectFontRef,
+        font: &Registered<F>,
     ) -> ()
     where
         S: Into<String>,
+        F: Borrow<Font>,
     {
         self.begin_text_section();
         self.set_font(font, font_size);
         self.set_text_cursor(x, y);
-        self.write_text(text, doc, font);
+        self.write_text(text, font);
         self.end_text_section();
-    }
-
-    // internal function to invoke an xobject
-    fn internal_invoke_xobject(&mut self, name: String) {
-        self.internal_add_operation(lopdf::content::Operation::new(
-            "Do",
-            vec![lopdf::Object::Name(name.as_bytes().to_vec())],
-        ));
     }
 
     #[inline(always)]

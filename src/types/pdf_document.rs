@@ -7,18 +7,13 @@ use utils::random_character_string_32;
 use crate::OffsetDateTime;
 use lopdf;
 
-use {
-    BuiltinFont, DirectFontRef, Error, ExternalFont, Font, FontList, IccProfileList,
-    IndirectFontRef, PdfConformance, PdfMetadata, PdfPage,
-};
+use {Embeddable, Embedded, Error, IccProfileList, PdfConformance, PdfMetadata, PdfPage};
 
 /// PDF document
 #[derive(Debug, Clone)]
 pub struct PdfDocument {
     /// Pages of the document
     pub(super) pages: Vec<PdfPage>,
-    /// Fonts used in this document
-    pub fonts: FontList,
     /// ICC profiles used in the document
     pub(super) icc_profiles: IccProfileList,
     /// Inner PDF document
@@ -35,7 +30,6 @@ impl PdfDocument {
         Self {
             pages: Vec::new(),
             document_id: random_character_string_32(),
-            fonts: FontList::new(),
             icc_profiles: IccProfileList::new(),
             inner_doc: lopdf::Document::with_version("1.3"),
             metadata: PdfMetadata::new(document_title, 1, false, PdfConformance::X3_2002_PDF_1_3),
@@ -103,85 +97,13 @@ impl PdfDocument {
         self.pages.push(page);
     }
 
-    /// Add a font from a font stream
-    pub fn add_external_font<R>(
-        &mut self,
-        font_stream: R,
-    ) -> ::std::result::Result<IndirectFontRef, Error>
-    where
-        R: ::std::io::Read,
-    {
-        let last_font_index = self.fonts.len();
-        let external_font = ExternalFont::new(font_stream, last_font_index)?;
-        let external_font_name = external_font.face_name.clone();
-        let font = Font::ExternalFont(external_font);
-
-        let font_ref;
-
-        let possible_ref = {
-            font_ref = IndirectFontRef::new(external_font_name);
-            match self.fonts.get_font(&font_ref) {
-                Some(f) => Some(f.clone()),
-                None => None,
-            }
-        };
-
-        if possible_ref.is_some() {
-            Ok(font_ref)
-        } else {
-            let direct_ref = DirectFontRef {
-                inner_obj: self.inner_doc.new_object_id(),
-                data: font,
-            };
-
-            self.fonts.add_font(font_ref.clone(), direct_ref);
-            Ok(font_ref)
-        }
-    }
-
-    /// Add a built-in font to the document
-    ///
-    /// Built-in fonts can only be used to print characters that are supported by the
-    /// [Windows-1252][] encoding.  All other characters will be ignored.
-    ///
-    /// [Windows-1252]: https://en.wikipedia.org/wiki/Windows-1252
-    pub fn add_builtin_font(
-        &mut self,
-        builtin_font: BuiltinFont,
-    ) -> ::std::result::Result<IndirectFontRef, Error> {
-        let builtin_font_name: &'static str = builtin_font.clone().into();
-
-        let font_ref;
-
-        let possible_ref = {
-            font_ref = IndirectFontRef::new(builtin_font_name);
-            match self.fonts.get_font(&font_ref) {
-                Some(f) => Some(f.clone()),
-                None => None,
-            }
-        };
-
-        if possible_ref.is_some() {
-            Ok(font_ref)
-        } else {
-            let direct_ref = DirectFontRef {
-                inner_obj: self.inner_doc.new_object_id(),
-                data: Font::BuiltinFont(builtin_font),
-            };
-
-            self.fonts.add_font(font_ref.clone(), direct_ref);
-            Ok(font_ref)
-        }
+    /// Embed a resource
+    #[inline]
+    pub fn embed<T: Embeddable>(&mut self, resource: T) -> lopdf::Result<Embedded<T>> {
+        super::pdf_resources::embed(&mut self.inner_doc, resource)
     }
 
     // ----- GET FUNCTIONS
-
-    /// Returns a direct reference (object ID) to the font from an
-    /// indirect reference (postscript name)
-    #[inline]
-    pub fn get_font(&self, font: &IndirectFontRef) -> Option<DirectFontRef> {
-        self.fonts.get_font(font)
-    }
 
     /// Drops the PDFDocument, returning the inner `lopdf::Document`.
     /// Document may be only half-written, use only in extreme cases
@@ -359,16 +281,6 @@ impl PdfDocument {
 
         // ----- PAGE CONTENT
 
-        // add fonts (shared resources)
-        let mut font_dict_id = None;
-
-        // add all fonts / other resources shared in the whole document
-        let fonts_dict: lopdf::Dictionary = self.fonts.into_with_document(&mut doc);
-
-        if fonts_dict.len() > 0 {
-            font_dict_id = Some(doc.add_object(Dictionary(fonts_dict)));
-        }
-
         for (idx, page) in self.pages.into_iter().enumerate() {
             let mut p = LoDictionary::from_iter(vec![
                 ("Type", "Page".into()),
@@ -390,12 +302,8 @@ impl PdfDocument {
 
             // this will collect the resources needed for rendering this page
             let layers_temp = ocg_list.iter().find(|e| e.0 == idx).unwrap();
-            let (mut resources_page, layer_streams) =
-                page.collect_resources_and_streams(&mut doc, &layers_temp.1);
-
-            if let Some(f) = font_dict_id {
-                resources_page.set("Font", Reference(f));
-            }
+            let (resources_page, layer_streams) =
+                page.collect_resources_and_streams(&layers_temp.1);
 
             if resources_page.len() > 0 {
                 let resources_page_id = doc.add_object(Dictionary(resources_page));

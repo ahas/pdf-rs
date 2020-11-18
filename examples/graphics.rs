@@ -59,14 +59,14 @@ fn main() {
     let outline_color_2 = Color::Greyscale(Greyscale::new(0.45, None));
 
     // More advanced graphical options
-    let gs = page1.add_graphics_state(
-        ExtendedGraphicsStateBuilder::new()
-            .with_blend_mode(BlendMode::Seperable(SeperableBlendMode::Multiply))
-            .with_overprint_stroke(true)
-            .build(),
-    );
+    let gs = ExtendedGraphicsStateBuilder::new()
+        .with_blend_mode(BlendMode::Seperable(SeperableBlendMode::Multiply))
+        .with_overprint_stroke(true)
+        .build();
+    let gs = doc.embed(&gs).unwrap();
+    let gs = page1.register(&gs);
 
-    layer1.set_graphics_state(gs);
+    layer1.set_graphics_state(&gs);
     layer1.set_line_dash_pattern(dash_pattern);
     layer1.set_line_cap_style(LineCapStyle::Round);
     layer1.set_line_join_style(LineJoinStyle::Round);

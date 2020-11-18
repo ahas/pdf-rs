@@ -13,11 +13,12 @@ fn main() {
 
     let mut font_reader =
         std::io::Cursor::new(include_bytes!("../assets/fonts/RobotoMedium.ttf").as_ref());
-
-    let font = doc.add_external_font(&mut font_reader).unwrap();
+    let font = Font::ExternalFont(ExternalFont::new(&mut font_reader).unwrap());
+    let font = doc.embed(&font).unwrap();
+    let font = page.register(&font);
 
     // `use_text` is a wrapper around making a simple string
-    layer.use_text(text, 48.0, Mm(10.0), Mm(200.0), &doc, &font);
+    layer.use_text(text, 48.0, Mm(10.0), Mm(200.0), &font);
 
     // text fill color = blue
     let blue = Rgb::new(13.0 / 256.0, 71.0 / 256.0, 161.0 / 256.0, None);
@@ -40,9 +41,9 @@ fn main() {
         layer.set_character_spacing(10.0);
 
         // write two lines (one line break)
-        layer.write_text(text, &doc, &font);
+        layer.write_text(text, &font);
         layer.add_line_break();
-        layer.write_text(text2, &doc, &font);
+        layer.write_text(text2, &font);
         layer.add_line_break();
 
         layer.set_text_rendering_mode(TextRenderingMode::FillStroke);
@@ -50,11 +51,11 @@ fn main() {
         layer.set_text_matrix(TextMatrix::Rotate(10.0));
 
         // write one line, but write text2 in superscript
-        layer.write_text(text, &doc, &font);
+        layer.write_text(text, &font);
         layer.set_line_offset(10.0);
         layer.set_text_rendering_mode(TextRenderingMode::Stroke);
         layer.set_font(&font, 18.0);
-        layer.write_text(text2, &doc, &font);
+        layer.write_text(text2, &font);
     }
     layer.end_text_section();
 

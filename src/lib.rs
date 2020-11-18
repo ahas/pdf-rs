@@ -381,6 +381,7 @@ pub use self::types::pdf_document::PdfDocument;
 pub use self::types::pdf_layer::PdfLayer;
 pub use self::types::pdf_metadata::PdfMetadata;
 pub use self::types::pdf_page::PdfPage;
+pub use self::types::pdf_resources::{Embeddable, Embedded, Registered};
 
 pub use self::types::plugins::misc::document_info::DocumentInfo;
 pub use self::types::plugins::xmp::xmp_metadata::XmpMetadata;
@@ -388,7 +389,7 @@ pub use self::types::plugins::xmp::xmp_metadata::XmpMetadata;
 /// Stub module for 3D content in a PDF
 pub use self::types::plugins::graphics::three_dimensional;
 pub use self::types::plugins::graphics::two_dimensional::font::{
-    BuiltinFont, DirectFontRef, ExternalFont, Font, FontList, IndirectFontRef, TextRenderingMode,
+    BuiltinFont, ExternalFont, Font, TextRenderingMode,
 };
 pub use self::types::plugins::graphics::two_dimensional::image::Image;
 pub use self::types::plugins::graphics::two_dimensional::line::Line;
@@ -400,11 +401,10 @@ pub use self::types::plugins::graphics::color::{
 pub use self::types::plugins::graphics::ctm::{CurTransMat, TextMatrix};
 pub use self::types::plugins::graphics::extgstate::{
     BlackGenerationExtraFunction, BlackGenerationFunction, BlendMode, ExtendedGraphicsState,
-    ExtendedGraphicsStateBuilder, ExtendedGraphicsStateList, ExtendedGraphicsStateRef,
-    HalftoneType, LineCapStyle, LineDashPattern, LineJoinStyle, NonSeperableBlendMode,
-    OverprintMode, RenderingIntent, SeperableBlendMode, SoftMask, SoftMaskFunction, SpotFunction,
-    TransferExtraFunction, TransferFunction, UnderColorRemovalExtraFunction,
-    UnderColorRemovalFunction,
+    ExtendedGraphicsStateBuilder, HalftoneType, LineCapStyle, LineDashPattern, LineJoinStyle,
+    NonSeperableBlendMode, OverprintMode, RenderingIntent, SeperableBlendMode, SoftMask,
+    SoftMaskFunction, SpotFunction, TransferExtraFunction, TransferFunction,
+    UnderColorRemovalExtraFunction, UnderColorRemovalFunction,
 };
 pub use self::types::plugins::graphics::icc_profile::{
     IccProfile, IccProfileList, IccProfileRef, IccProfileType,
@@ -414,8 +414,8 @@ pub use self::types::plugins::graphics::pattern::{Pattern, PatternList, PatternR
 pub use self::types::plugins::graphics::pdf_resources::PdfResources;
 pub use self::types::plugins::graphics::xobject::{
     FormType, FormXObject, FormXObjectRef, GroupXObject, GroupXObjectType, ImageFilter,
-    ImageXObject, ImageXObjectRef, OCGIntent, OptionalContentGroup, PostScriptXObject,
-    ReferenceXObject, SMask, XObject, XObjectList, XObjectRef,
+    ImageXObject, OCGIntent, OptionalContentGroup, PostScriptXObject, ReferenceXObject, SMask,
+    XObject,
 };
 
 /// Stub module for interactive (JavaScript) content, embedded in PDF files

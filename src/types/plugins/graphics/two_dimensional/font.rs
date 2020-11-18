@@ -2,14 +2,15 @@
 
 //! Embedding fonts in 2D for Pdf
 use lopdf;
-use lopdf::{Stream as LoStream, Dictionary as LoDictionary};
 use lopdf::StringFormat;
+use lopdf::{Dictionary as LoDictionary, Stream as LoStream};
 use std::collections::BTreeMap;
 use std::iter::FromIterator;
+use types::pdf_resources::Embeddable;
 use Error;
 
-use rusttype::FontCollection;
 use rusttype::Codepoint as Cp;
+use rusttype::FontCollection;
 use rusttype::GlyphId as Gid;
 
 /// The font
@@ -19,6 +20,18 @@ pub enum Font {
     BuiltinFont(BuiltinFont),
     /// Represents a font loaded from an external file
     ExternalFont(ExternalFont),
+}
+
+impl Embeddable for Font {
+    const KEY: &'static str = "Font";
+
+    fn embed(&self, doc: &mut lopdf::Document) -> lopdf::Result<lopdf::ObjectId> {
+        let o = match self {
+            Font::ExternalFont(font) => font.into_with_document(doc),
+            Font::BuiltinFont(font) => (*font).into(),
+        };
+        Ok(doc.add_object(o))
+    }
 }
 
 /// Standard built-in PDF fonts
@@ -40,24 +53,30 @@ pub enum BuiltinFont {
     ZapfDingbats,
 }
 
+impl Into<Font> for BuiltinFont {
+    fn into(self) -> Font {
+        Font::BuiltinFont(self)
+    }
+}
+
 impl Into<&'static str> for BuiltinFont {
     fn into(self) -> &'static str {
         use BuiltinFont::*;
         match self {
-            TimesRoman              => "Times-Roman",
-            TimesBold               => "Times-Bold",
-            TimesItalic             => "Times-Italic",
-            TimesBoldItalic         => "Times-BoldItalic",
-            Helvetica               => "Helvetica",
-            HelveticaBold           => "Helvetica-Bold",
-            HelveticaOblique        => "Helvetica-Oblique",
-            HelveticaBoldOblique    => "Helvetica-BoldOblique",
-            Courier                 => "Courier",
-            CourierOblique          => "Courier-Oblique",
-            CourierBold             => "Courier-Bold",
-            CourierBoldOblique      => "Courier-BoldOblique",
-            Symbol                  => "Symbol",
-            ZapfDingbats            => "ZapfDingbats",
+            TimesRoman => "Times-Roman",
+            TimesBold => "Times-Bold",
+            TimesItalic => "Times-Italic",
+            TimesBoldItalic => "Times-BoldItalic",
+            Helvetica => "Helvetica",
+            HelveticaBold => "Helvetica-Bold",
+            HelveticaOblique => "Helvetica-Oblique",
+            HelveticaBoldOblique => "Helvetica-BoldOblique",
+            Courier => "Courier",
+            CourierOblique => "Courier-Oblique",
+            CourierBold => "Courier-Bold",
+            CourierBoldOblique => "Courier-BoldOblique",
+            Symbol => "Symbol",
+            ZapfDingbats => "ZapfDingbats",
         }
     }
 }
@@ -82,12 +101,21 @@ impl Into<LoDictionary> for BuiltinFont {
     }
 }
 
+impl Embeddable for BuiltinFont {
+    const KEY: &'static str = "Font";
+
+    fn embed(&self, doc: &mut lopdf::Document) -> lopdf::Result<lopdf::ObjectId> {
+        let o: LoDictionary = (*self).into();
+        Ok(doc.add_object(o))
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ExternalFont {
     /// Font data
     pub(crate) font_bytes: Vec<u8>,
     /// Font name, for adding as a resource on the document
-    pub(crate) face_name: String,
+    // pub(crate) face_name: String,
     /// Is the font written vertically? Default: false
     pub(crate) vertical_writing: bool,
 }
@@ -111,9 +139,7 @@ pub enum TextRenderingMode {
 }
 
 impl Into<i64> for TextRenderingMode {
-    fn into(self)
-    -> i64
-    {
+    fn into(self) -> i64 {
         use TextRenderingMode::*;
         match self {
             Fill => 0,
@@ -129,51 +155,50 @@ impl Into<i64> for TextRenderingMode {
 }
 
 impl ExternalFont {
-
     /// Creates a new font. The `index` is used for naming / identifying the font
-    pub fn new<R>(mut font_stream: R, font_index: usize)
-    -> Result<Self, Error> where R: ::std::io::Read
+    pub fn new<R>(mut font_stream: R) -> Result<Self, Error>
+    where
+        R: ::std::io::Read,
     {
         // read font from stream and parse font metrics
         let mut buf = Vec::<u8>::new();
         font_stream.read_to_end(&mut buf)?;
 
-        let face_name = {
+        // verify
+        {
             let collection = FontCollection::from_bytes(buf.clone())?;
-            collection.clone().into_font().unwrap_or(collection.font_at(0)?);
-            format!("F{}", font_index)
+            let _font = collection
+                .clone()
+                .into_font()
+                .unwrap_or(collection.font_at(0)?);
         };
 
         Ok(Self {
             font_bytes: buf,
-            face_name: face_name,
             vertical_writing: false,
         })
     }
 
     /// Takes the font and adds it to the document and consumes the font
-    pub(crate) fn into_with_document(self, doc: &mut lopdf::Document)
-    -> LoDictionary
-    {
+    pub(crate) fn into_with_document(&self, doc: &mut lopdf::Document) -> LoDictionary {
         use lopdf::Object;
         use lopdf::Object::*;
 
-        let face_name = self.face_name.clone();
+        let face_name = format!("Fo{}", doc.objects.len());
 
-        let font_buf_ref: Box<[u8]> = self.font_bytes.into_boxed_slice();
-        let collection = FontCollection::from_bytes(font_buf_ref.clone()).unwrap();
-        let font = collection.clone().into_font().unwrap_or_else(|_| {
-            collection.font_at(0).unwrap()
-        });
+        let collection = FontCollection::from_bytes(&self.font_bytes).unwrap();
+        let font = collection
+            .clone()
+            .into_font()
+            .unwrap_or_else(|_| collection.font_at(0).unwrap());
 
         // Extract basic font information
         let face_metrics = font.v_metrics_unscaled();
 
         let font_stream = LoStream::new(
-            LoDictionary::from_iter(vec![
-                ("Length1", Integer(font_buf_ref.len() as i64)),
-                ]),
-            font_buf_ref.to_vec())
+            LoDictionary::from_iter(vec![("Length1", Integer(self.font_bytes.len() as i64))]),
+            self.font_bytes.clone(),
+        )
         .with_compression(false); /* important! font stream must not be compressed! */
 
         // Begin setting required font attributes
@@ -212,7 +237,6 @@ impl ExternalFont {
         cmap.insert(0, (0, 1000, 1000));
 
         for unicode in 0x0000..0xffff {
-
             let glyph = font.glyph(Cp(unicode));
 
             if glyph.id().0 == 0 {
@@ -223,14 +247,16 @@ impl ExternalFont {
             let glyph = font.glyph(Gid(glyph_id));
 
             if let Some(glyph_metrics) = glyph.standalone().get_data() {
-
                 let w = glyph_metrics.unit_h_metrics.advance_width;
 
                 // Note: extents can be None, but then the character may still have a
                 // horizontal advance!
-                let h = glyph_metrics.extents.and_then(|extents| {
-                    Some(extents.max.y - extents.min.y - face_metrics.descent as i32)
-                }).unwrap_or(1000);
+                let h = glyph_metrics
+                    .extents
+                    .and_then(|extents| {
+                        Some(extents.max.y - extents.min.y - face_metrics.descent as i32)
+                    })
+                    .unwrap_or(1000);
 
                 if h > max_height {
                     max_height = h;
@@ -251,7 +277,7 @@ impl ExternalFont {
         // Since the glyph IDs are sequential, all we really have to do is to enumerate the vector
         // and create buckets of 100 / rest to 256 if needed
 
-        let mut cur_first_bit: u16 = 0_u16;     // current first bit of the glyph id (0x10 or 0x12) for example
+        let mut cur_first_bit: u16 = 0_u16; // current first bit of the glyph id (0x10 or 0x12) for example
 
         let mut all_cmap_blocks = Vec::new();
 
@@ -259,7 +285,6 @@ impl ExternalFont {
             let mut current_cmap_block = Vec::new();
 
             for (glyph_id, unicode_width_tuple) in &cmap {
-
                 if (*glyph_id >> 8) as u16 != cur_first_bit || current_cmap_block.len() >= 100 {
                     // end the current (beginbfchar endbfchar) block
                     all_cmap_blocks.push(current_cmap_block.clone());
@@ -270,14 +295,15 @@ impl ExternalFont {
                 let (unicode, width, _) = *unicode_width_tuple;
                 current_cmap_block.push((*glyph_id, unicode));
                 widths.push((*glyph_id, width));
-            };
+            }
 
             all_cmap_blocks.push(current_cmap_block);
         }
 
         let cid_to_unicode_map = generate_cid_to_unicode_map(face_name.clone(), all_cmap_blocks);
 
-        let cid_to_unicode_map_stream = LoStream::new(LoDictionary::new(), cid_to_unicode_map.as_bytes().to_vec());
+        let cid_to_unicode_map_stream =
+            LoStream::new(LoDictionary::new(), cid_to_unicode_map.as_bytes().to_vec());
         let cid_to_unicode_map_stream_id = doc.add_object(cid_to_unicode_map_stream);
 
         // encode widths / heights so that they fit into what PDF expects
@@ -312,29 +338,44 @@ impl ExternalFont {
         widths_list.push(Array(current_width_vec.drain(..).collect()));
 
         let w = {
-            if self.vertical_writing { ("W2",  Array(widths_list)) }
-            else { ("W",  Array(widths_list)) }
+            if self.vertical_writing {
+                ("W2", Array(widths_list))
+            } else {
+                ("W", Array(widths_list))
+            }
         };
 
         // default width for characters
         let dw = {
-            if self.vertical_writing { ("DW2", Integer(1000)) }
-            else { ("DW", Integer(1000)) }
+            if self.vertical_writing {
+                ("DW2", Integer(1000))
+            } else {
+                ("DW", Integer(1000))
+            }
         };
 
         let mut desc_fonts = LoDictionary::from_iter(vec![
             ("Type", Name("Font".into())),
             ("Subtype", Name("CIDFontType2".into())),
             ("BaseFont", Name(face_name.clone().into())),
-            ("CIDSystemInfo", Dictionary(LoDictionary::from_iter(vec![
+            (
+                "CIDSystemInfo",
+                Dictionary(LoDictionary::from_iter(vec![
                     ("Registry", String("Adobe".into(), StringFormat::Literal)),
                     ("Ordering", String("Identity".into(), StringFormat::Literal)),
                     ("Supplement", Integer(0)),
-            ]))),
-            w, dw,
+                ])),
+            ),
+            w,
+            dw,
         ]);
 
-        let font_bbox = vec![ Integer(0), Integer(max_height as i64), Integer(total_width as i64), Integer(max_height as i64) ];
+        let font_bbox = vec![
+            Integer(0),
+            Integer(max_height as i64),
+            Integer(total_width as i64),
+            Integer(max_height as i64),
+        ];
         font_descriptor_vec.push(("FontFile2".into(), Reference(doc.add_object(font_stream))));
 
         // although the following entry is technically not needed, Adobe Reader needs it
@@ -344,10 +385,28 @@ impl ExternalFont {
 
         desc_fonts.set("FontDescriptor", Reference(font_descriptor_vec_id));
 
-        font_vec.push(("DescendantFonts".into(), Array(vec![Dictionary(desc_fonts)])));
+        font_vec.push((
+            "DescendantFonts".into(),
+            Array(vec![Dictionary(desc_fonts)]),
+        ));
         font_vec.push(("ToUnicode".into(), Reference(cid_to_unicode_map_stream_id)));
 
         LoDictionary::from_iter(font_vec)
+    }
+}
+
+impl Into<Font> for ExternalFont {
+    fn into(self) -> Font {
+        Font::ExternalFont(self)
+    }
+}
+
+impl Embeddable for ExternalFont {
+    const KEY: &'static str = "Font";
+
+    fn embed(&self, doc: &mut lopdf::Document) -> lopdf::Result<lopdf::ObjectId> {
+        let o = self.into_with_document(doc);
+        Ok(doc.add_object(o))
     }
 }
 
@@ -357,10 +416,15 @@ type CmapBlock = Vec<(GlyphId, UnicodeCodePoint)>;
 
 /// Generates a CMAP (character map) from valid cmap blocks
 fn generate_cid_to_unicode_map(face_name: String, all_cmap_blocks: Vec<CmapBlock>) -> String {
+    let mut cid_to_unicode_map = format!(
+        include_str!("../../../../templates/gid_to_unicode_beg.txt"),
+        face_name
+    );
 
-    let mut cid_to_unicode_map = format!(include_str!("../../../../templates/gid_to_unicode_beg.txt"), face_name);
-
-    for cmap_block in all_cmap_blocks.into_iter().filter(|block| !block.is_empty() || block.len() < 100) {
+    for cmap_block in all_cmap_blocks
+        .into_iter()
+        .filter(|block| !block.is_empty() || block.len() < 100)
+    {
         cid_to_unicode_map.push_str(format!("{} beginbfchar\r\n", cmap_block.len()).as_str());
         for (glyph_id, unicode) in cmap_block {
             cid_to_unicode_map.push_str(format!("<{:04x}> <{:04x}>\n", glyph_id, unicode).as_str());
@@ -375,108 +439,6 @@ fn generate_cid_to_unicode_map(face_name: String, all_cmap_blocks: Vec<CmapBlock
 impl PartialEq for ExternalFont {
     /// Two fonts are equal if their names are equal, the contents aren't checked
     fn eq(&self, other: &ExternalFont) -> bool {
-        self.face_name == other.face_name
-    }
-}
-
-/// Indexed reference to a font that was added to the document
-/// This is a "reference by postscript name"
-#[derive(Debug, Hash, Eq, Ord, Clone, PartialEq, PartialOrd)]
-pub struct IndirectFontRef {
-    /// Name of the font (postscript name)
-    pub(crate) name: String,
-}
-
-/// Direct reference (wrapper for `lopdf::Object::Reference`)
-/// for increased type safety
-#[derive(Debug, Clone)]
-pub struct DirectFontRef {
-    /// Reference to the content in the document stream
-    pub(crate) inner_obj: lopdf::ObjectId,
-    /// Actual font data
-    pub(crate) data: Font,
-}
-
-impl IndirectFontRef {
-    /// Creates a new IndirectFontRef from an index
-    pub fn new<S>(name: S)
-    -> Self where S: Into<String>
-    {
-        Self {
-            name: name.into(),
-        }
-    }
-}
-
-/// Font list for tracking fonts within a single PDF document
-#[derive(Default, Debug, Clone)]
-pub struct FontList {
-    fonts: BTreeMap<IndirectFontRef, DirectFontRef>,
-}
-
-impl FontList {
-
-    /// Creates a new FontList
-    pub fn new()
-    -> Self
-    {
-        Self::default()
-    }
-
-    /// Adds a font to the FontList
-    pub fn add_font(&mut self, font_ref: IndirectFontRef, font: DirectFontRef)
-    -> IndirectFontRef
-    {
-        self.fonts.insert(font_ref.clone(), font);
-        font_ref
-    }
-
-    /// Turns an indirect font reference into a direct one
-    /// (Warning): clones the direct font reference
-    #[inline]
-    pub fn get_font(&self, font: &IndirectFontRef)
-    -> Option<DirectFontRef>
-    {
-        let font_ref = self.fonts.get(font);
-        if let Some(r) = font_ref {
-            Some(r.clone())
-        } else {
-            None
-        }
-    }
-
-    /// Returns the number of fonts currenly in use
-    #[inline]
-    pub fn len(&self)
-    -> usize
-    {
-        self.fonts.len()
-    }
-
-    /// Returns if the font list is empty
-    #[inline]
-    pub fn is_empty(&self)
-    -> bool
-    {
-        self.fonts.is_empty()
-    }
-
-    /// Converts the fonts into a dictionary
-    pub(crate) fn into_with_document(self, doc: &mut lopdf::Document)
-    ->lopdf::Dictionary
-    {
-        let mut font_dict = lopdf::Dictionary::new();
-
-        for (indirect_ref, direct_font_ref) in self.fonts {
-            let font_dict_collected = match direct_font_ref.data {
-                Font::ExternalFont(font) => font.into_with_document(doc),
-                Font::BuiltinFont(font)  => font.into(),
-            };
-
-            doc.objects.insert(direct_font_ref.inner_obj, lopdf::Object::Dictionary(font_dict_collected));
-            font_dict.set(indirect_ref.name,lopdf::Object::Reference(direct_font_ref.inner_obj));
-        }
-
-        font_dict
+        self.font_bytes == other.font_bytes
     }
 }
