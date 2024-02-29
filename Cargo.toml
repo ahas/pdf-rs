@@ -15,7 +15,7 @@ time = { version = "0.2.11", default-features = false, features = ["std"] }
 log = { version = "0.4.8", optional = true }
 
 [dependencies.image]
-version = "0.23"
+version = "0.24"
 default-features = false
 features = ["gif", "jpeg", "png", "pnm", "tiff", "bmp"]
 optional = true

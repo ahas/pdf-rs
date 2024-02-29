@@ -3,3 +3,5 @@ target/*
 .vscode/*
 .cargo/*
 test_*.pdf
+/result
+/.direnv
