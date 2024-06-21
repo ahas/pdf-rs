@@ -2,7 +2,7 @@
 #![cfg_attr(feature = "cargo-clippy", allow(string_lit_as_bytes))]
 
 use crate::OffsetDateTime;
-#[cfg(feature = "embedded_images")]
+#[cfg(feature = "image")]
 use image::{DynamicImage, GenericImageView, ImageDecoder, ImageError};
 use lopdf;
 use {ColorBits, ColorSpace, CurTransMat, Embeddable, Px};
@@ -44,12 +44,16 @@ impl XObject {
 impl Into<lopdf::Object> for XObject {
     fn into(self) -> lopdf::Object {
         match self {
-            XObject::Image(image) => lopdf::Object::Stream(Self::compress_stream(image.into())),
+            XObject::Image(image) => {
+                lopdf::Object::Stream(Self::compress_stream(image.into()))
+            }
             XObject::Form(form) => {
                 let cur_form: FormXObject = *form;
                 lopdf::Object::Stream(Self::compress_stream(cur_form.into()))
             }
-            XObject::PostScript(ps) => lopdf::Object::Stream(Self::compress_stream(ps.into())),
+            XObject::PostScript(ps) => {
+                lopdf::Object::Stream(Self::compress_stream(ps.into()))
+            }
         }
     }
 }
@@ -110,8 +114,8 @@ impl<'a> ImageXObject {
         }
     }
 
-    #[cfg(feature = "embedded_images")]
-    pub fn try_from<T: ImageDecoder<'a>>(image: T) -> Result<Self, ImageError> {
+    #[cfg(feature = "image")]
+    pub fn try_from<T: ImageDecoder>(image: T) -> Result<Self, ImageError> {
         use image::error::{LimitError, LimitErrorKind};
         use std::usize;
 
@@ -144,11 +148,11 @@ impl<'a> ImageXObject {
         })
     }
 
-    #[cfg(feature = "embedded_images")]
-    pub fn from_dynamic_image(image: &DynamicImage) -> Self {
+    #[cfg(feature = "image")]
+    pub fn from_dynamic_image(image: DynamicImage) -> Self {
         let dim = image.dimensions();
         let color_type = image.color();
-        let data = image.to_bytes();
+        let data = image.into_bytes();
         let color_bits = ColorBits::from(color_type);
         let color_space = ColorSpace::from(color_type);
 
@@ -172,7 +176,8 @@ impl Into<lopdf::Stream> for ImageXObject {
         use std::iter::FromIterator;
 
         let cs: &'static str = self.color_space.into();
-        let bbox: lopdf::Object = self.clipping_bbox.unwrap_or(CurTransMat::Identity).into();
+        let bbox: lopdf::Object =
+            self.clipping_bbox.unwrap_or(CurTransMat::Identity).into();
 
         let mut dict = lopdf::Dictionary::from_iter(vec![
             ("Type", Name("XObject".as_bytes().to_vec())),
@@ -195,7 +200,9 @@ impl Into<lopdf::Stream> for ImageXObject {
                         // not necessary, unless missing in the jpeg header
                         (
                             "DecodeParams",
-                            Dictionary(lopdf::dictionary!("ColorTransform" => Integer(0))),
+                            Dictionary(
+                                lopdf::dictionary!("ColorTransform" => Integer(0)),
+                            ),
                         ),
                     ]
                 }
@@ -220,7 +227,8 @@ impl Embeddable for ImageXObject {
         use std::iter::FromIterator;
 
         let cs: &'static str = self.color_space.into();
-        let bbox: lopdf::Object = self.clipping_bbox.unwrap_or(CurTransMat::Identity).into();
+        let bbox: lopdf::Object =
+            self.clipping_bbox.unwrap_or(CurTransMat::Identity).into();
 
         let mut dict = lopdf::Dictionary::from_iter(vec![
             ("Type", Name("XObject".as_bytes().to_vec())),
@@ -248,7 +256,9 @@ impl Embeddable for ImageXObject {
                         // not necessary, unless missing in the jpeg header
                         (
                             "DecodeParams",
-                            Dictionary(lopdf::dictionary!("ColorTransform" => Integer(0))),
+                            Dictionary(
+                                lopdf::dictionary!("ColorTransform" => Integer(0)),
+                            ),
                         ),
                     ]
                 }
@@ -548,7 +558,9 @@ impl Embeddable for SMask {
                         // not necessary, unless missing in the jpeg header
                         (
                             "DecodeParams",
-                            Dictionary(lopdf::dictionary!("ColorTransform" => Integer(0))),
+                            Dictionary(
+                                lopdf::dictionary!("ColorTransform" => Integer(0)),
+                            ),
                         ),
                     ]
                 }
@@ -602,7 +614,8 @@ impl Embeddable for SMask {
 #[derive(Debug, Copy, Clone)]
 pub struct GroupXObject {
     /* /Type /Group */
-/* /S /Transparency */ /* currently the only valid GroupXObject */}
+    /* /S /Transparency */ /* currently the only valid GroupXObject */
+}
 
 #[derive(Debug, Copy, Clone)]
 pub enum GroupXObjectType {

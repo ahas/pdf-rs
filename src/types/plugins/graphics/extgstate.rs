@@ -373,7 +373,10 @@ impl ExtendedGraphicsStateBuilder {
 
     /// Sets the transfer function
     #[inline]
-    pub fn with_transfer(mut self, transfer_function: Option<TransferFunction>) -> Self {
+    pub fn with_transfer(
+        mut self,
+        transfer_function: Option<TransferFunction>,
+    ) -> Self {
         self.gs.transfer_function = transfer_function;
         self.gs.changed_fields.insert(TRANSFER_FUNCTION);
         self
@@ -612,37 +615,40 @@ impl Into<lopdf::Object> for ExtendedGraphicsState {
         // need to implement Into<Object> for them
 
         if self.changed_fields.contains(BLACK_GENERATION) {
-            if let Some(ref black_generation) = self.black_generation {}
+            if let Some(ref _black_generation) = self.black_generation {}
         }
 
         if self.changed_fields.contains(BLACK_GENERATION_EXTRA) {
-            if let Some(ref black_generation_extra) = self.black_generation_extra {}
+            if let Some(ref _black_generation_extra) = self.black_generation_extra {}
         }
 
         if self.changed_fields.contains(UNDERCOLOR_REMOVAL) {
-            if let Some(ref under_color_removal) = self.under_color_removal {}
+            if let Some(ref _under_color_removal) = self.under_color_removal {}
         }
 
         if self.changed_fields.contains(UNDERCOLOR_REMOVAL_EXTRA) {
-            if let Some(ref under_color_removal_extra) = self.under_color_removal_extra {}
+            if let Some(ref _under_color_removal_extra) = self.under_color_removal_extra
+            {
+            }
         }
 
         if self.changed_fields.contains(TRANSFER_FUNCTION) {
-            if let Some(ref transfer_function) = self.transfer_function {}
+            if let Some(ref _transfer_function) = self.transfer_function {}
         }
 
         if self.changed_fields.contains(TRANSFER_FUNCTION_EXTRA) {
-            if let Some(ref transfer_extra_function) = self.transfer_extra_function {}
+            if let Some(ref _transfer_extra_function) = self.transfer_extra_function {}
         }
 
         if self.changed_fields.contains(HALFTONE_DICTIONARY) {
-            if let Some(ref halftone_dictionary) = self.halftone_dictionary {}
+            if let Some(ref _halftone_dictionary) = self.halftone_dictionary {}
         }
 
         if self.changed_fields.contains(SOFT_MASK) {
-            if let Some(ref soft_mask) = self.soft_mask {
+            if let Some(ref _soft_mask) = self.soft_mask {
             } else {
-                gs_operations.push(("SM".to_string(), Name("None".as_bytes().to_vec())));
+                gs_operations
+                    .push(("SM".to_string(), Name("None".as_bytes().to_vec())));
             }
         }
 
@@ -1432,7 +1438,8 @@ impl Into<lopdf::Object> for LineDashPattern {
     fn into(self) -> lopdf::Object {
         use lopdf::Object::*;
         let (dash_array, offset) = self.into();
-        let mut dash_array_ints: Vec<lopdf::Object> = dash_array.into_iter().map(Integer).collect();
+        let mut dash_array_ints: Vec<lopdf::Object> =
+            dash_array.into_iter().map(Integer).collect();
         dash_array_ints.push(Integer(offset));
         Array(dash_array_ints)
     }

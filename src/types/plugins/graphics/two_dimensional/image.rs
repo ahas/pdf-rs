@@ -19,14 +19,14 @@ impl From<ImageXObject> for Image {
     }
 }
 
-#[cfg(feature = "embedded_images")]
-impl<'a> Image {
-    pub fn try_from<T: ImageDecoder<'a>>(image: T) -> Result<Self, image::ImageError> {
+#[cfg(feature = "image")]
+impl Image {
+    pub fn try_from<T: ImageDecoder>(image: T) -> Result<Self, image::ImageError> {
         let image = ImageXObject::try_from(image)?;
         Ok(Self { image })
     }
 
-    pub fn from_dynamic_image(image: &DynamicImage) -> Self {
+    pub fn from_dynamic_image(image: DynamicImage) -> Self {
         Self {
             image: ImageXObject::from_dynamic_image(image),
         }

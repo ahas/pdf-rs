@@ -359,7 +359,7 @@ extern crate rusttype;
 extern crate time;
 
 pub mod date;
-#[cfg(feature = "embedded_images")]
+#[cfg(feature = "image")]
 pub extern crate image;
 
 pub mod errors;
@@ -400,11 +400,12 @@ pub use self::types::plugins::graphics::color::{
 };
 pub use self::types::plugins::graphics::ctm::{CurTransMat, TextMatrix};
 pub use self::types::plugins::graphics::extgstate::{
-    BlackGenerationExtraFunction, BlackGenerationFunction, BlendMode, ExtendedGraphicsState,
-    ExtendedGraphicsStateBuilder, HalftoneType, LineCapStyle, LineDashPattern, LineJoinStyle,
-    NonSeperableBlendMode, OverprintMode, RenderingIntent, SeperableBlendMode, SoftMask,
-    SoftMaskFunction, SpotFunction, TransferExtraFunction, TransferFunction,
-    UnderColorRemovalExtraFunction, UnderColorRemovalFunction,
+    BlackGenerationExtraFunction, BlackGenerationFunction, BlendMode,
+    ExtendedGraphicsState, ExtendedGraphicsStateBuilder, HalftoneType, LineCapStyle,
+    LineDashPattern, LineJoinStyle, NonSeperableBlendMode, OverprintMode,
+    RenderingIntent, SeperableBlendMode, SoftMask, SoftMaskFunction, SpotFunction,
+    TransferExtraFunction, TransferFunction, UnderColorRemovalExtraFunction,
+    UnderColorRemovalFunction,
 };
 pub use self::types::plugins::graphics::icc_profile::{
     IccProfile, IccProfileList, IccProfileRef, IccProfileType,
@@ -414,8 +415,8 @@ pub use self::types::plugins::graphics::pattern::{Pattern, PatternList, PatternR
 pub use self::types::plugins::graphics::pdf_resources::PdfResources;
 pub use self::types::plugins::graphics::xobject::{
     FormType, FormXObject, FormXObjectRef, GroupXObject, GroupXObjectType, ImageFilter,
-    ImageXObject, OCGIntent, OptionalContentGroup, PostScriptXObject, ReferenceXObject, SMask,
-    XObject,
+    ImageXObject, OCGIntent, OptionalContentGroup, PostScriptXObject, ReferenceXObject,
+    SMask, XObject,
 };
 
 /// Stub module for interactive (JavaScript) content, embedded in PDF files

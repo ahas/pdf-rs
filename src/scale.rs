@@ -51,8 +51,12 @@ impl_partialeq!(Pt);
 pub struct Px(pub usize);
 
 impl Px {
+    pub fn into_mm(self, dpi: f64) -> Mm {
+        Mm(self.0 as f64 * (25.4 / dpi))
+    }
+
     pub fn into_pt(self, dpi: f64) -> Pt {
-        Mm(self.0 as f64 * (25.4 / dpi)).into()
+        self.into_mm(dpi).into()
     }
 }
 

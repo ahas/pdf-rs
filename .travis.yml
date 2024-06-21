@@ -17,7 +17,7 @@ matrix:
 script:
   - cargo check --verbose --examples
   - cargo check --verbose --no-default-features
-  - cargo check --verbose --features="embedded_images"
+  - cargo check --verbose --features="image"
   - cargo test --verbose
 
 notifications:

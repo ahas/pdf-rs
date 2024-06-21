@@ -1,6 +1,6 @@
 //! Color module (CMYK or RGB). Shared between 2D and 3D module.
 
-#[cfg(feature = "embedded_images")]
+#[cfg(feature = "image")]
 use image;
 use lopdf::content::Operation;
 
@@ -63,7 +63,7 @@ pub enum ColorSpace {
     GreyscaleAlpha,
 }
 
-#[cfg(feature = "embedded_images")]
+#[cfg(feature = "image")]
 impl From<image::ColorType> for ColorSpace {
     fn from(color_type: image::ColorType) -> Self {
         use image::ColorType::*;
@@ -98,7 +98,7 @@ pub enum ColorBits {
     Bit16,
 }
 
-#[cfg(feature = "embedded_images")]
+#[cfg(feature = "image")]
 impl From<image::ColorType> for ColorBits {
     fn from(color_type: image::ColorType) -> ColorBits {
         use image::ColorType::*;
