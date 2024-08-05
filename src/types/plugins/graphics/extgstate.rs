@@ -602,7 +602,7 @@ impl Into<lopdf::Object> for ExtendedGraphicsState {
             }
         }
 
-        if let Some(ref font) = self.font {
+        if let Some(ref _font) = self.font {
             if self.changed_fields.contains(FONT) {
                 // let font_ref: lopdf::Object = font.into(); /* should be a reference to a font dictionary later on*/
                 // gs_operations.push(("Font".to_string(), font_ref));

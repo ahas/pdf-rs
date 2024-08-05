@@ -7,8 +7,9 @@ use types::RegisteredXObject;
 use glob_defines::OP_PATH_STATE_SET_LINE_WIDTH;
 use lopdf::content::Operation;
 use {
-    Color, CurTransMat, ExtendedGraphicsState, Font, Image, Line, LineCapStyle, LineDashPattern,
-    LineJoinStyle, Mm, PdfColor, Pt, Registered, TextMatrix, TextRenderingMode,
+    Color, CurTransMat, ExtendedGraphicsState, Font, Image, Line, LineCapStyle,
+    LineDashPattern, LineJoinStyle, Mm, PdfColor, Pt, Registered, TextMatrix,
+    TextRenderingMode,
 };
 
 /// One layer of PDF data
@@ -42,7 +43,8 @@ impl Into<lopdf::Stream> for PdfLayer {
         };
 
         // page contents may not be compressed (todo: is this valid for XObjects?)
-        Stream::new(Dictionary::new(), stream_content.encode().unwrap()).with_compression(false)
+        Stream::new(Dictionary::new(), stream_content.encode().unwrap())
+            .with_compression(false)
     }
 }
 
@@ -150,7 +152,7 @@ impl PdfLayer {
         }
 
         // invoke object
-        self.internal_add_operation(lopdf::content::Operation::new(
+        self.internal_add_operation(Operation::new(
             "Do",
             vec![lopdf::Object::Name(xobj.xobject_name())],
         ));
@@ -253,7 +255,10 @@ impl PdfLayer {
     pub fn set_text_cursor(&mut self, x: Mm, y: Mm) {
         let x_in_pt: Pt = x.into();
         let y_in_pt: Pt = y.into();
-        self.internal_add_operation(Operation::new("Td", vec![x_in_pt.into(), y_in_pt.into()]));
+        self.internal_add_operation(Operation::new(
+            "Td",
+            vec![x_in_pt.into(), y_in_pt.into()],
+        ));
     }
 
     /// If called inside a text block scoped by `begin_text_section` and
@@ -269,7 +274,10 @@ impl PdfLayer {
     /// (must be called within `begin_text_block` and `end_text_block`)
     #[inline]
     pub fn set_line_height(&mut self, height: f64) {
-        self.internal_add_operation(Operation::new("TL", vec![lopdf::Object::Real(height)]));
+        self.internal_add_operation(Operation::new(
+            "TL",
+            vec![lopdf::Object::Real(height)],
+        ));
     }
 
     /// Sets the character spacing inside a text block
@@ -277,7 +285,10 @@ impl PdfLayer {
     /// the spacing inside a word by 3pt.
     #[inline]
     pub fn set_character_spacing(&mut self, spacing: f64) {
-        self.internal_add_operation(Operation::new("Tc", vec![lopdf::Object::Real(spacing)]));
+        self.internal_add_operation(Operation::new(
+            "Tc",
+            vec![lopdf::Object::Real(spacing)],
+        ));
     }
 
     /// Sets the word spacing inside a text block.
@@ -290,7 +301,10 @@ impl PdfLayer {
     /// with builtin fonts.
     #[inline]
     pub fn set_word_spacing(&mut self, spacing: f64) {
-        self.internal_add_operation(Operation::new("Tw", vec![lopdf::Object::Real(spacing)]));
+        self.internal_add_operation(Operation::new(
+            "Tw",
+            vec![lopdf::Object::Real(spacing)],
+        ));
     }
 
     /// Sets the horizontal scaling (like a "condensed" font)
@@ -299,7 +313,10 @@ impl PdfLayer {
     /// but stretch the text
     #[inline]
     pub fn set_text_scaling(&mut self, scaling: f64) {
-        self.internal_add_operation(Operation::new("Tz", vec![lopdf::Object::Real(scaling)]));
+        self.internal_add_operation(Operation::new(
+            "Tz",
+            vec![lopdf::Object::Real(scaling)],
+        ));
     }
 
     /// Offsets the current text positon (used for superscript
@@ -309,7 +326,10 @@ impl PdfLayer {
     /// change the size of the font
     #[inline]
     pub fn set_line_offset(&mut self, offset: f64) {
-        self.internal_add_operation(Operation::new("Ts", vec![lopdf::Object::Real(offset)]));
+        self.internal_add_operation(Operation::new(
+            "Ts",
+            vec![lopdf::Object::Real(offset)],
+        ));
     }
 
     #[inline]
@@ -337,7 +357,10 @@ impl PdfLayer {
             })
             .collect::<Vec<u8>>();
 
-        self.internal_add_operation(Operation::new("Tj", vec![String(bytes, Hexadecimal)]));
+        self.internal_add_operation(Operation::new(
+            "Tj",
+            vec![String(bytes, Hexadecimal)],
+        ));
     }
 
     /// Add text to the file at the current position by specifying
@@ -396,7 +419,8 @@ impl PdfLayer {
 
             if let Font::ExternalFont(face_direct_ref) = font.object.borrow() {
                 let mut list_gid = Vec::<u16>::new();
-                let collection = FontCollection::from_bytes(&*face_direct_ref.font_bytes).unwrap();
+                let collection =
+                    FontCollection::from_bytes(&*face_direct_ref.font_bytes).unwrap();
                 let font = collection
                     .clone()
                     .into_font()
@@ -426,7 +450,10 @@ impl PdfLayer {
             }
         };
 
-        self.internal_add_operation(Operation::new("Tj", vec![String(bytes, Hexadecimal)]));
+        self.internal_add_operation(Operation::new(
+            "Tj",
+            vec![String(bytes, Hexadecimal)],
+        ));
     }
 
     /// Saves the current graphic state

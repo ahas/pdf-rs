@@ -7,10 +7,13 @@ use utils::random_character_string_32;
 use crate::OffsetDateTime;
 use lopdf;
 
-use {Embeddable, Embedded, Error, IccProfileList, PdfConformance, PdfMetadata, PdfPage};
+use {
+    Embeddable, Embedded, Error, IccProfileList, PdfConformance, PdfMetadata, PdfPage,
+};
 
 /// PDF document
 #[derive(Debug, Clone)]
+#[allow(unused)]
 pub struct PdfDocument {
     /// Pages of the document
     pub(super) pages: Vec<PdfPage>,
@@ -32,7 +35,12 @@ impl PdfDocument {
             document_id: random_character_string_32(),
             icc_profiles: IccProfileList::new(),
             inner_doc: lopdf::Document::with_version("1.3"),
-            metadata: PdfMetadata::new(document_title, 1, false, PdfConformance::X3_2002_PDF_1_3),
+            metadata: PdfMetadata::new(
+                document_title,
+                1,
+                false,
+                PdfConformance::X3_2002_PDF_1_3,
+            ),
         }
     }
 }
@@ -127,7 +135,10 @@ impl PdfDocument {
 
     /// Tries to match the document to the given conformance.
     /// Errors only on an unrecoverable error.
-    pub fn repair_errors(&self, _conformance: PdfConformance) -> ::std::result::Result<(), Error> {
+    pub fn repair_errors(
+        &self,
+        _conformance: PdfConformance,
+    ) -> ::std::result::Result<(), Error> {
         // TODO
         #[cfg(feature = "logging")]
         {
@@ -138,7 +149,10 @@ impl PdfDocument {
     }
 
     /// Save PDF Document, writing the contents to the target
-    pub fn save<W: Write>(self, target: &mut BufWriter<W>) -> ::std::result::Result<(), Error> {
+    pub fn save<W: Write>(
+        self,
+        target: &mut BufWriter<W>,
+    ) -> ::std::result::Result<(), Error> {
         use lopdf::Object::*;
         use lopdf::StringFormat::Literal;
         use lopdf::{Dictionary as LoDictionary, Object as LoObject};
@@ -241,12 +255,14 @@ impl PdfDocument {
                     layer_names
                         .into_iter()
                         .map(|layer_name| {
-                            Reference(doc.add_object(Dictionary(LoDictionary::from_iter(vec![
-                                ("Type", Name("OCG".into())),
-                                ("Name", String(layer_name.into(), Literal)),
-                                ("Intent", Reference(intent_arr_ref)),
-                                ("Usage", Reference(usage_ocg_dict_ref)),
-                            ]))))
+                            Reference(doc.add_object(Dictionary(
+                                LoDictionary::from_iter(vec![
+                                    ("Type", Name("OCG".into())),
+                                    ("Name", String(layer_name.into(), Literal)),
+                                    ("Intent", Reference(intent_arr_ref)),
+                                    ("Usage", Reference(usage_ocg_dict_ref)),
+                                ]),
+                            )))
                         })
                         .enumerate()
                         .collect(),
@@ -287,15 +303,18 @@ impl PdfDocument {
                 ("Rotate", Integer(0)),
                 (
                     "MediaBox",
-                    vec![0.into(), 0.into(), page.width.into(), page.height.into()].into(),
+                    vec![0.into(), 0.into(), page.width.into(), page.height.into()]
+                        .into(),
                 ),
                 (
                     "TrimBox",
-                    vec![0.into(), 0.into(), page.width.into(), page.height.into()].into(),
+                    vec![0.into(), 0.into(), page.width.into(), page.height.into()]
+                        .into(),
                 ),
                 (
                     "CropBox",
-                    vec![0.into(), 0.into(), page.width.into(), page.height.into()].into(),
+                    vec![0.into(), 0.into(), page.width.into(), page.height.into()]
+                        .into(),
                 ),
                 ("Parent", Reference(pages_id)),
             ]);

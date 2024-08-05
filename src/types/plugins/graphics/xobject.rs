@@ -439,6 +439,7 @@ impl Into<lopdf::Stream> for FormXObject {
 */
 
 #[derive(Debug, Clone)]
+#[allow(unused)]
 pub struct FormXObjectRef {
     name: String,
 }
@@ -671,6 +672,7 @@ pub enum OCGIntent {
 
 /// TODO, very low priority
 #[derive(Debug, Clone)]
+#[allow(unused)]
 pub struct PostScriptXObject {
     /// __(Optional)__ A stream whose contents are to be used in
     /// place of the PostScript XObject’s stream when the target

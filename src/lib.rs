@@ -387,7 +387,6 @@ pub use self::types::plugins::misc::document_info::DocumentInfo;
 pub use self::types::plugins::xmp::xmp_metadata::XmpMetadata;
 
 /// Stub module for 3D content in a PDF
-pub use self::types::plugins::graphics::three_dimensional;
 pub use self::types::plugins::graphics::two_dimensional::font::{
     BuiltinFont, ExternalFont, Font, TextRenderingMode,
 };
