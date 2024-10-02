@@ -1,5 +1,5 @@
 // clippy lints when serializing PDF strings, in this case its wrong
-#![cfg_attr(feature = "cargo-clippy", allow(string_lit_as_bytes))]
+#![cfg_attr(feature = "clippy", allow(string_lit_as_bytes))]
 
 use crate::OffsetDateTime;
 #[cfg(feature = "image")]
@@ -44,16 +44,12 @@ impl XObject {
 impl Into<lopdf::Object> for XObject {
     fn into(self) -> lopdf::Object {
         match self {
-            XObject::Image(image) => {
-                lopdf::Object::Stream(Self::compress_stream(image.into()))
-            }
+            XObject::Image(image) => lopdf::Object::Stream(Self::compress_stream(image.into())),
             XObject::Form(form) => {
                 let cur_form: FormXObject = *form;
                 lopdf::Object::Stream(Self::compress_stream(cur_form.into()))
             }
-            XObject::PostScript(ps) => {
-                lopdf::Object::Stream(Self::compress_stream(ps.into()))
-            }
+            XObject::PostScript(ps) => lopdf::Object::Stream(Self::compress_stream(ps.into())),
         }
     }
 }
@@ -89,8 +85,8 @@ pub struct ImageXObject {
 
 impl<'a> ImageXObject {
     /// Creates a new ImageXObject
-    // #[cfg_attr(feature = "cargo-clippy", allow(needless_lifetimes))]
-    #[cfg_attr(feature = "cargo-clippy", allow(too_many_arguments))]
+    // #[cfg_attr(feature = "clippy", allow(needless_lifetimes))]
+    #[cfg_attr(feature = "clippy", allow(too_many_arguments))]
     pub fn new(
         width: Px,
         height: Px,
@@ -176,8 +172,7 @@ impl Into<lopdf::Stream> for ImageXObject {
         use std::iter::FromIterator;
 
         let cs: &'static str = self.color_space.into();
-        let bbox: lopdf::Object =
-            self.clipping_bbox.unwrap_or(CurTransMat::Identity).into();
+        let bbox: lopdf::Object = self.clipping_bbox.unwrap_or(CurTransMat::Identity).into();
 
         let mut dict = lopdf::Dictionary::from_iter(vec![
             ("Type", Name("XObject".as_bytes().to_vec())),
@@ -200,9 +195,7 @@ impl Into<lopdf::Stream> for ImageXObject {
                         // not necessary, unless missing in the jpeg header
                         (
                             "DecodeParams",
-                            Dictionary(
-                                lopdf::dictionary!("ColorTransform" => Integer(0)),
-                            ),
+                            Dictionary(lopdf::dictionary!("ColorTransform" => Integer(0))),
                         ),
                     ]
                 }
@@ -227,8 +220,7 @@ impl Embeddable for ImageXObject {
         use std::iter::FromIterator;
 
         let cs: &'static str = self.color_space.into();
-        let bbox: lopdf::Object =
-            self.clipping_bbox.unwrap_or(CurTransMat::Identity).into();
+        let bbox: lopdf::Object = self.clipping_bbox.unwrap_or(CurTransMat::Identity).into();
 
         let mut dict = lopdf::Dictionary::from_iter(vec![
             ("Type", Name("XObject".as_bytes().to_vec())),
@@ -256,9 +248,7 @@ impl Embeddable for ImageXObject {
                         // not necessary, unless missing in the jpeg header
                         (
                             "DecodeParams",
-                            Dictionary(
-                                lopdf::dictionary!("ColorTransform" => Integer(0)),
-                            ),
+                            Dictionary(lopdf::dictionary!("ColorTransform" => Integer(0))),
                         ),
                     ]
                 }
@@ -559,9 +549,7 @@ impl Embeddable for SMask {
                         // not necessary, unless missing in the jpeg header
                         (
                             "DecodeParams",
-                            Dictionary(
-                                lopdf::dictionary!("ColorTransform" => Integer(0)),
-                            ),
+                            Dictionary(lopdf::dictionary!("ColorTransform" => Integer(0))),
                         ),
                     ]
                 }

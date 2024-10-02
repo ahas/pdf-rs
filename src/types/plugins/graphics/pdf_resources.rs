@@ -25,7 +25,7 @@ impl PdfResources {
     /// See `XObject::Into_with_document`.
     /// The resources also need access to the layers (the optional content groups), this should be a
     /// `Vec<lopdf::Object::Reference>` (to the actual OCG groups, which are added on the document level)
-    #[cfg_attr(feature = "cargo-clippy", allow(needless_return))]
+    #[cfg_attr(feature = "clippy", allow(needless_return))]
     pub fn into_with_layers(self, layers: Vec<lopdf::Object>) -> (lopdf::Dictionary, Vec<OCGRef>) {
         let mut dict = lopdf::Dictionary::new();
 

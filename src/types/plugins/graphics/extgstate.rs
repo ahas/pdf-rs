@@ -373,10 +373,7 @@ impl ExtendedGraphicsStateBuilder {
 
     /// Sets the transfer function
     #[inline]
-    pub fn with_transfer(
-        mut self,
-        transfer_function: Option<TransferFunction>,
-    ) -> Self {
+    pub fn with_transfer(mut self, transfer_function: Option<TransferFunction>) -> Self {
         self.gs.transfer_function = transfer_function;
         self.gs.changed_fields.insert(TRANSFER_FUNCTION);
         self
@@ -528,7 +525,7 @@ impl Into<lopdf::Object> for ExtendedGraphicsState {
     /// Compares the current graphics state with the previous one and returns an
     /// "optimized" graphics state, meaning only the fields that have changed in
     /// comparison to the previous one are returned.
-    #[cfg_attr(feature = "cargo-clippy", allow(cyclomatic_complexity))]
+    #[cfg_attr(feature = "clippy", allow(cyclomatic_complexity))]
     fn into(self) -> lopdf::Object {
         use std::iter::FromIterator;
         let mut gs_operations = Vec::<(String, lopdf::Object)>::new();
@@ -627,9 +624,7 @@ impl Into<lopdf::Object> for ExtendedGraphicsState {
         }
 
         if self.changed_fields.contains(UNDERCOLOR_REMOVAL_EXTRA) {
-            if let Some(ref _under_color_removal_extra) = self.under_color_removal_extra
-            {
-            }
+            if let Some(ref _under_color_removal_extra) = self.under_color_removal_extra {}
         }
 
         if self.changed_fields.contains(TRANSFER_FUNCTION) {
@@ -647,8 +642,7 @@ impl Into<lopdf::Object> for ExtendedGraphicsState {
         if self.changed_fields.contains(SOFT_MASK) {
             if let Some(ref _soft_mask) = self.soft_mask {
             } else {
-                gs_operations
-                    .push(("SM".to_string(), Name("None".as_bytes().to_vec())));
+                gs_operations.push(("SM".to_string(), Name("None".as_bytes().to_vec())));
             }
         }
 
@@ -1372,9 +1366,9 @@ impl LineDashPattern {
 
 // conversion into a dash array for reuse in operation / gs dictionary
 impl Into<(Vec<i64>, i64)> for LineDashPattern {
-    #[cfg_attr(feature = "cargo-clippy", allow(never_loop))]
-    #[cfg_attr(feature = "cargo-clippy", allow(while_let_loop))]
-    #[cfg_attr(feature = "cargo-clippy", allow(needless_return))]
+    #[cfg_attr(feature = "clippy", allow(never_loop))]
+    #[cfg_attr(feature = "clippy", allow(while_let_loop))]
+    #[cfg_attr(feature = "clippy", allow(needless_return))]
     fn into(self) -> (Vec<i64>, i64) {
         let mut dash_array = Vec::<i64>::new();
 
@@ -1438,8 +1432,7 @@ impl Into<lopdf::Object> for LineDashPattern {
     fn into(self) -> lopdf::Object {
         use lopdf::Object::*;
         let (dash_array, offset) = self.into();
-        let mut dash_array_ints: Vec<lopdf::Object> =
-            dash_array.into_iter().map(Integer).collect();
+        let mut dash_array_ints: Vec<lopdf::Object> = dash_array.into_iter().map(Integer).collect();
         dash_array_ints.push(Integer(offset));
         Array(dash_array_ints)
     }
