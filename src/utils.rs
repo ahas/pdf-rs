@@ -195,7 +195,7 @@ fn u8_to_char(input: u8) -> char {
 }
 
 #[inline]
-pub fn calculate_text_size<S, F>(text: S, font: &Registered<F>, font_size: f64) -> (Pt, Pt)
+pub fn measure_text<S, F>(text: S, font: &Registered<F>, font_size: f64) -> (Pt, Pt)
 where
   S: AsRef<str>,
   F: Borrow<Font>,
